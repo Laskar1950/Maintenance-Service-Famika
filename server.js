@@ -7,8 +7,10 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const supabase = createClient('https://bwfbntebndkbglmbziij.supabase.co', 
-                              'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU');
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_ANON_KEY
+);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
