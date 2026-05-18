@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
@@ -7,17 +6,24 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_ANON_KEY
-);
+// ─── UTAMAKAN ISI DUA BARIS INI DENGAN BENAR ────────────────────────────
+// Masukkan link URL dan Anon Key Anda langsung di dalam tanda petik tunggal ('')
+const JALUR_SUPABASE_URL = 'https://bwfbntebndkbglmbziij.supabase.co';
+const KUNCI_SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU';
+// ───────────────────────────────────────────────────────────────────────
+
+// Inisialisasi klien Supabase menggunakan variabel di atas
+const supabase = createClient(JALUR_SUPABASE_URL, KUNCI_SUPABASE_ANON);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Jalur halaman utama agar Vercel tidak eror saat dibuka di browser
 app.get('/', (req, res) => {
     res.status(200).send('🚀 Server Middleware Famika Aktif & Siap Menerima Data Lapangan!');
 });
 
+// Fungsi Kompresi Gambar & Unggah ke Supabase Storage
 async function compressAndUpload(fileBuffer, originalName, fieldName) {
     const fileName = `${fieldName}-${Date.now()}-${originalName.replace(/\s+/g, '_')}.jpg`;
     
@@ -39,6 +45,7 @@ async function compressAndUpload(fileBuffer, originalName, fieldName) {
     return publicUrl;
 }
 
+// Endpoint API untuk menerima input Preventif ODC
 app.post('/api/report/odc', upload.fields([
     { name: 'before_tutup', maxCount: 1 },
     { name: 'before_buka', maxCount: 1 },
