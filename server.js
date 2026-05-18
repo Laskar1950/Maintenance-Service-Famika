@@ -11,6 +11,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANO
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.get('/', (req, res) => {
+    res.status(200).send('🚀 Server Middleware Famika Aktif & Siap Menerima Data Lapangan!');
+});
 
 async function compressAndUpload(fileBuffer, originalName, fieldName) {
     const fileName = `${fieldName}-${Date.now()}-${originalName.replace(/\s+/g, '_')}.jpg`;
