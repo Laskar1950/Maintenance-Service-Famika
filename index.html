@@ -124,8 +124,8 @@
                 <div class="flex items-center gap-3.5"><div class="bg-rose-50 text-rose-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Dismantling (Cabut)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pencabutan material & dropcore pelanggan</p></div></div>
                 <span class="text-slate-300 group-hover:text-rose-600">➔</span>
             </div>
-            <div onclick="showView('form_aktivasi')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
-                <div class="flex items-center gap-3.5"><div class="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivasi Baru</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemasangan & uji redaman pelanggan baru</p></div></div>
+            <div onclick="showView('form_psb')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
+                <div class="flex items-center gap-3.5"><div class="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivasi Baru (PSB)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemasangan & uji redaman pelanggan baru</p></div></div>
                 <span class="text-slate-300 group-hover:text-amber-600">➔</span>
             </div>
         </div>
@@ -192,9 +192,12 @@ if (tg) { tg.expand(); tg.ready(); const u = tg.initDataUnsafe?.user; if (u) tec
 document.getElementById('tech-username').innerText = technicianUsername;
 
 // ============================================================
-// DEFINISI FORM PER MENU
+// DEFINISI FORM — SESUAI KOLOM TABEL SUPABASE
 // ============================================================
 const FORM_DEFINITIONS = {
+
+    // Tabel: pm_odc
+    // Kolom: period_id, site_id, odc_id, technician_id, tanggal, kondisi, kegiatan, hasil_opm, redaman, catatan, status
     form_odc: {
         title: 'Form Aktivitas ODC',
         subtitle: 'Preventif Box ODC & Redaman OPM',
@@ -202,36 +205,39 @@ const FORM_DEFINITIONS = {
         photoLabels: ['Foto Kondisi Box ODC', 'Foto Hasil Redaman OPM', 'Foto Kondisi Kabel/Tray'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data ODC</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data ODC — pm_odc</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kode ODC</label>
-                    <select id="kode_odc" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kode ODC <span class="text-rose-400">*</span></label>
+                    <select id="odc_id" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
                         <option value="" disabled selected>Memuat daftar ODC...</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Box ODC</label>
-                    <select id="kondisi_box_odc" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Box ODC <span class="text-rose-400">*</span></label>
+                    <select id="kondisi" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
                         <option value="">Pilih Kondisi</option>
-                        <option value="Baik">Baik</option>
-                        <option value="Rusak Ringan">Rusak Ringan</option>
-                        <option value="Rusak Berat">Rusak Berat</option>
+                        <option value="BAIK">BAIK</option>
+                        <option value="RUSAK RINGAN">RUSAK RINGAN</option>
+                        <option value="RUSAK BERAT">RUSAK BERAT</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nilai Redaman OPM (dBm)</label>
-                    <input type="number" step="0.01" id="redaman_opm" placeholder="Contoh: -18.5" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Hasil OPM (dBm) <span class="text-rose-400">*</span></label>
+                    <input type="number" step="0.01" id="hasil_opm" placeholder="Contoh: -18.5" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Jumlah Core Terpakai</label>
-                    <input type="number" id="core_terpakai" placeholder="Contoh: 12" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Redaman (dB)</label>
+                    <input type="number" step="0.01" id="redaman" placeholder="Contoh: 2.5" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan Tambahan</label>
-                    <textarea id="catatan" rows="3" placeholder="Catatan kondisi, keluhan, dll..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
+                    <textarea id="catatan" rows="3" placeholder="Catatan kondisi, temuan lapangan..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
                 </div>
             </div>`
     },
+
+    // Tabel: pm_odp
+    // Kolom: period_id, site_id, odc_id, odp_id, technician_id, tanggal, sisa_port, kondisi, kegiatan, hasil_opm, redaman, catatan, status
     form_odp: {
         title: 'Form Aktivitas ODP',
         subtitle: 'Preventif Box ODP dengan Relasi ODC',
@@ -239,31 +245,39 @@ const FORM_DEFINITIONS = {
         photoLabels: ['Foto Kondisi Box ODP', 'Foto Port ODP', 'Foto Kabel Drop'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data ODP</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data ODP — pm_odp</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC Induk</label>
-                    <select id="kode_odc" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC Induk <span class="text-rose-400">*</span></label>
+                    <select id="odc_id" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
                         <option value="" disabled selected>Memuat daftar ODC...</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih Kode ODP</label>
-                    <select id="kode_odp" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required disabled>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih Kode ODP <span class="text-rose-400">*</span></label>
+                    <select id="odp_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required disabled>
                         <option value="" disabled selected>Pilih ODC terlebih dahulu</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Box ODP</label>
-                    <select id="kondisi_box_odp" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Box ODP <span class="text-rose-400">*</span></label>
+                    <select id="kondisi" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
                         <option value="">Pilih Kondisi</option>
-                        <option value="Baik">Baik</option>
-                        <option value="Rusak Ringan">Rusak Ringan</option>
-                        <option value="Rusak Berat">Rusak Berat</option>
+                        <option value="BAIK">BAIK</option>
+                        <option value="RUSAK RINGAN">RUSAK RINGAN</option>
+                        <option value="RUSAK BERAT">RUSAK BERAT</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Jumlah Port Terpakai</label>
-                    <input type="number" id="port_terpakai" placeholder="Contoh: 6" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Sisa Port (jumlah port kosong) <span class="text-rose-400">*</span></label>
+                    <input type="text" id="sisa_port" placeholder="Contoh: 2" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Hasil OPM (dBm)</label>
+                    <input type="number" step="0.01" id="hasil_opm" placeholder="Contoh: -21.0" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Redaman (dB)</label>
+                    <input type="number" step="0.01" id="redaman" placeholder="Contoh: 3.2" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
@@ -271,6 +285,9 @@ const FORM_DEFINITIONS = {
                 </div>
             </div>`
     },
+
+    // Tabel: pm_closure
+    // Kolom: period_id, site_id, odc_id, closure_id, technician_id, tanggal, kondisi, kegiatan, catatan, status
     form_closure: {
         title: 'Form Preventif Closure',
         subtitle: 'Pendataan Fisik Sambungan Closure Kabel',
@@ -278,39 +295,37 @@ const FORM_DEFINITIONS = {
         photoLabels: ['Foto Closure Tampak Luar', 'Foto Sambungan Dalam', 'Foto Lokasi Tiang/Jalur'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Closure</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Closure — pm_closure</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor / ID Closure</label>
-                    <input type="text" id="id_closure" placeholder="Contoh: CLS-001" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Tipe Closure</label>
-                    <select id="tipe_closure" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
-                        <option value="">Pilih Tipe</option>
-                        <option value="Aerial">Aerial (Udara)</option>
-                        <option value="Underground">Underground (Tanah)</option>
-                        <option value="Wall-mount">Wall-mount (Dinding)</option>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC Induk <span class="text-rose-400">*</span></label>
+                    <select id="odc_id" onchange="fetchClosuresForOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
+                        <option value="" disabled selected>Memuat daftar ODC...</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Fisik</label>
-                    <select id="kondisi_closure" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih Kode Closure <span class="text-rose-400">*</span></label>
+                    <select id="closure_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required disabled>
+                        <option value="" disabled selected>Pilih ODC terlebih dahulu</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Closure <span class="text-rose-400">*</span></label>
+                    <select id="kondisi" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
                         <option value="">Pilih Kondisi</option>
-                        <option value="Baik">Baik</option>
-                        <option value="Retak/Bocor">Retak / Bocor</option>
-                        <option value="Perlu Ganti">Perlu Penggantian</option>
+                        <option value="BAIK">BAIK</option>
+                        <option value="RETAK/BOCOR">RETAK / BOCOR</option>
+                        <option value="PERLU GANTI">PERLU PENGGANTIAN</option>
                     </select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Jumlah Core Tersambung</label>
-                    <input type="number" id="core_tersambung" placeholder="Contoh: 24" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
-                    <textarea id="catatan" rows="3" placeholder="Catatan kondisi fisik..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
+                    <textarea id="catatan" rows="3" placeholder="Catatan kondisi fisik closure..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
                 </div>
             </div>`
     },
+
+    // Tabel: pm_span
+    // Kolom: period_id, site_id, odc_id, span_id, technician_id, tanggal, kondisi, kegiatan, catatan, status
     form_span: {
         title: 'Form Span Kabel',
         subtitle: 'Pemeriksaan Fisik Bentangan & Spare Kabel',
@@ -318,28 +333,28 @@ const FORM_DEFINITIONS = {
         photoLabels: ['Foto Bentangan Kabel', 'Foto Kondisi Tiang', 'Foto Spare Kabel'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Span Kabel</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Span Kabel — pm_span</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Segmen / Jalur Kabel</label>
-                    <input type="text" id="segmen_kabel" placeholder="Contoh: Jl. Diponegoro - Jl. Sudirman" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Panjang Span (meter)</label>
-                    <input type="number" id="panjang_span" placeholder="Contoh: 150" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Kabel</label>
-                    <select id="kondisi_kabel" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
-                        <option value="">Pilih Kondisi</option>
-                        <option value="Baik">Baik</option>
-                        <option value="Kendur">Kendur</option>
-                        <option value="Patah/Putus">Patah / Putus</option>
-                        <option value="Tergerus">Tergerus / Terkelupas</option>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC Induk <span class="text-rose-400">*</span></label>
+                    <select id="odc_id" onchange="fetchSpansForOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required>
+                        <option value="" disabled selected>Memuat daftar ODC...</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Spare Kabel Tersedia (meter)</label>
-                    <input type="number" id="spare_kabel" placeholder="Contoh: 20" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih Span Kabel <span class="text-rose-400">*</span></label>
+                    <select id="span_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required disabled>
+                        <option value="" disabled selected>Pilih ODC terlebih dahulu</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Kondisi Kabel <span class="text-rose-400">*</span></label>
+                    <select id="kondisi" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
+                        <option value="">Pilih Kondisi</option>
+                        <option value="BAIK">BAIK</option>
+                        <option value="KENDUR">KENDUR</option>
+                        <option value="PATAH/PUTUS">PATAH / PUTUS</option>
+                        <option value="TERGERUS">TERGERUS / TERKELUPAS</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
@@ -347,115 +362,153 @@ const FORM_DEFINITIONS = {
                 </div>
             </div>`
     },
+
+    // Tabel: corrective_customer
+    // Kolom: period_id, site_id, odc_id(nullable), odp_id(nullable), technician_id, tanggal,
+    //        customer_name, service_id, port_no(nullable), action, catatan, status
     form_gangguan: {
         title: 'Form Penanganan Gangguan',
         subtitle: 'Perbaikan Kendala Jaringan Pelanggan',
-        table: 'pm_gangguan',
+        table: 'corrective_customer',
         photoLabels: ['Foto Sebelum Perbaikan', 'Foto Sesudah Perbaikan', 'Foto Lokasi Gangguan'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Gangguan</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Gangguan — corrective_customer</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor Tiket / INSIDEN</label>
-                    <input type="text" id="no_tiket" placeholder="Contoh: INC-20260520-001" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelanggan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="customer_name" placeholder="Nama lengkap pelanggan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelanggan</label>
-                    <input type="text" id="nama_pelanggan" placeholder="Nama pelanggan terdampak" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Service ID / No. Layanan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="service_id" placeholder="Contoh: FMK-00123" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Jenis Gangguan</label>
-                    <select id="jenis_gangguan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
-                        <option value="">Pilih Jenis</option>
-                        <option value="Kabel Putus">Kabel Putus</option>
-                        <option value="Redaman Tinggi">Redaman Tinggi</option>
-                        <option value="Konektor Longgar">Konektor Longgar</option>
-                        <option value="ODP Rusak">ODP Rusak</option>
-                        <option value="Lainnya">Lainnya</option>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC (opsional)</label>
+                    <select id="odc_id" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none">
+                        <option value="">— Tidak dipilih —</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Tindakan Perbaikan</label>
-                    <textarea id="tindakan" rows="3" placeholder="Jelaskan tindakan yang dilakukan..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none" required></textarea>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODP (opsional)</label>
+                    <select id="odp_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" disabled>
+                        <option value="">— Pilih ODC dulu —</option>
+                    </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Status Penanganan</label>
-                    <select id="status_gangguan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
-                        <option value="">Pilih Status</option>
-                        <option value="Selesai">Selesai / Clear</option>
-                        <option value="Eskalasi">Eskalasi ke Tim Lain</option>
-                        <option value="Pending Material">Pending Material</option>
-                    </select>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor Port ODP</label>
+                    <input type="number" id="port_no" placeholder="Contoh: 4" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Tindakan Perbaikan <span class="text-rose-400">*</span></label>
+                    <textarea id="action" rows="3" placeholder="Jelaskan tindakan yang dilakukan..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none" required></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan Tambahan</label>
+                    <textarea id="catatan" rows="2" placeholder="Keterangan lain..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
                 </div>
             </div>`
     },
+
+    // Tabel: dismantling_records
+    // Kolom: period_id, site_id, odc_id(nullable), odp_id(nullable), technician_id, tanggal,
+    //        customer_name, service_id, port_no(nullable), action, catatan, status
     form_dismantling: {
         title: 'Form Dismantling (Cabut)',
         subtitle: 'Pencabutan Material & Dropcore Pelanggan',
-        table: 'pm_dismantling',
+        table: 'dismantling_records',
         photoLabels: ['Foto Sebelum Pencabutan', 'Foto Material Tercabut', 'Foto Kondisi Akhir'],
         fields: () => `
             <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Dismantling</h3>
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Dismantling — dismantling_records</h3>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama / ID Pelanggan</label>
-                    <input type="text" id="id_pelanggan" placeholder="Contoh: FMK-00123" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelanggan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="customer_name" placeholder="Nama lengkap pelanggan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Alamat Lokasi</label>
-                    <input type="text" id="alamat_lokasi" placeholder="Alamat lengkap lokasi pencabutan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Service ID / No. Layanan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="service_id" placeholder="Contoh: FMK-00456" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Material yang Dicabut</label>
-                    <div class="space-y-1.5">
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="cabut_ont" class="rounded"> ONT/Modem</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="cabut_dropcore" class="rounded"> Kabel Dropcore</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="cabut_roset" class="rounded"> Roset/Pigtail</label>
-                        <label class="flex items-center gap-2 text-xs"><input type="checkbox" id="cabut_adaptor" class="rounded"> Adaptor/Power Supply</label>
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
-                    <textarea id="catatan" rows="3" placeholder="Kondisi material, alasan cabut, dll..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
-                </div>
-            </div>`
-    },
-    form_aktivasi: {
-        title: 'Form Aktivasi Baru',
-        subtitle: 'Pemasangan & Uji Redaman Pelanggan Baru',
-        table: 'pm_aktivasi',
-        photoLabels: ['Foto Pemasangan ONT', 'Foto Hasil Redaman', 'Foto Kondisi Rumah Pelanggan'],
-        fields: () => `
-            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
-                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Aktivasi</h3>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelanggan</label>
-                    <input type="text" id="nama_pelanggan" placeholder="Nama lengkap pelanggan baru" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor Order / ID</label>
-                    <input type="text" id="no_order" placeholder="Contoh: ORD-20260520-001" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nilai Redaman Pelanggan (dBm)</label>
-                    <input type="number" step="0.01" id="redaman_pelanggan" placeholder="Contoh: -21.5" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">ODP yang Digunakan</label>
-                    <input type="text" id="odp_digunakan" placeholder="Contoh: ODP-KRY-001" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Status Aktivasi</label>
-                    <select id="status_aktivasi" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required>
-                        <option value="">Pilih Status</option>
-                        <option value="Sukses">Sukses - Layanan Aktif</option>
-                        <option value="Gagal Redaman">Gagal - Redaman Buruk</option>
-                        <option value="Pending">Pending - Kendala Teknis</option>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC (opsional)</label>
+                    <select id="odc_id" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none">
+                        <option value="">— Tidak dipilih —</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan</label>
-                    <textarea id="catatan" rows="3" placeholder="Catatan pemasangan..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODP (opsional)</label>
+                    <select id="odp_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" disabled>
+                        <option value="">— Pilih ODC dulu —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor Port ODP</label>
+                    <input type="number" id="port_no" placeholder="Contoh: 3" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Tindakan / Keterangan Cabut <span class="text-rose-400">*</span></label>
+                    <textarea id="action" rows="3" placeholder="Contoh: Cabut ONT + dropcore, pelanggan tidak aktif" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none" required></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan Tambahan</label>
+                    <textarea id="catatan" rows="2" placeholder="Kondisi material, alasan cabut, dll..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
+                </div>
+            </div>`
+    },
+
+    // Tabel: psb_records
+    // Kolom: period_id, site_id, odc_id(nullable), odp_id(nullable), technician_id, tanggal,
+    //        customer_name, service_id, port_no, alamat, action, material, sn_ont, catatan, status
+    form_psb: {
+        title: 'Form Aktivasi Baru (PSB)',
+        subtitle: 'Pemasangan & Uji Redaman Pelanggan Baru',
+        table: 'psb_records',
+        photoLabels: ['Foto Pemasangan ONT', 'Foto Hasil Redaman OPM', 'Foto Kondisi Rumah Pelanggan'],
+        fields: () => `
+            <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
+                <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider border-b pb-2">Data Aktivasi PSB — psb_records</h3>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nama Pelanggan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="customer_name" placeholder="Nama lengkap pelanggan baru" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Service ID / No. Order <span class="text-rose-400">*</span></label>
+                    <input type="text" id="service_id" placeholder="Contoh: ORD-20260520-001" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Alamat Pelanggan <span class="text-rose-400">*</span></label>
+                    <input type="text" id="alamat" placeholder="Alamat lengkap lokasi pemasangan" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODC (opsional)</label>
+                    <select id="odc_id" onchange="fetchOdpsForSelectedOdc()" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none">
+                        <option value="">— Tidak dipilih —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Pilih ODP <span class="text-rose-400">*</span></label>
+                    <select id="odp_id" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3 py-3 focus:outline-none" required disabled>
+                        <option value="">— Pilih ODC dulu —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Nomor Port ODP <span class="text-rose-400">*</span></label>
+                    <input type="number" id="port_no" placeholder="Contoh: 5" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Serial Number ONT (SN ONT) <span class="text-rose-400">*</span></label>
+                    <input type="text" id="sn_ont" placeholder="Contoh: HWTC1234ABCD" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Material Terpasang <span class="text-rose-400">*</span></label>
+                    <input type="text" id="material" value="Dropcore, ONT" placeholder="Contoh: Dropcore, ONT" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-3 focus:outline-none" required />
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Tindakan / Hasil Aktivasi <span class="text-rose-400">*</span></label>
+                    <textarea id="action" rows="3" placeholder="Contoh: Aktivasi berhasil, redaman -21 dBm" class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none" required></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 mb-1">Catatan Tambahan</label>
+                    <textarea id="catatan" rows="2" placeholder="Catatan pemasangan..." class="w-full bg-slate-50 border border-slate-200 text-sm rounded-xl px-3 py-2 focus:outline-none resize-none"></textarea>
                 </div>
             </div>`
     }
@@ -492,11 +545,9 @@ function showView(viewName) {
     backBtn.classList.remove('hidden');
     logoContainer.classList.add('hidden');
 
-    // Render field form dinamis
     document.getElementById('dynamic-form-fields').innerHTML = def.fields();
     compressedBlobs = {};
 
-    // Render kotak foto
     const photoContainer = document.getElementById('photo-boxes-container');
     photoContainer.innerHTML = def.photoLabels.map((label, i) => `
         <div class="space-y-2">
@@ -512,8 +563,9 @@ function showView(viewName) {
 
     document.getElementById('pm-form').classList.remove('hidden');
 
-    // Load dropdown ODC jika form ODC atau ODP
-    if (viewName === 'form_odc' || viewName === 'form_odp') {
+    // Load dropdown ODC untuk semua form yang membutuhkan
+    const needsOdc = ['form_odc','form_odp','form_closure','form_span','form_gangguan','form_dismantling','form_psb'];
+    if (needsOdc.includes(viewName)) {
         syncAndRenderOdcDropdown();
     }
 
@@ -526,7 +578,6 @@ function showView(viewName) {
 function handlePhotoSelect(event, index) {
     const file = event.target.files[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = function(e) {
         const img = new Image();
@@ -550,7 +601,7 @@ function handlePhotoSelect(event, index) {
 }
 
 // ============================================================
-// SUBMIT FORM
+// SUBMIT FORM — sesuai kolom tabel Supabase
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
@@ -576,14 +627,21 @@ async function handleSubmit(event) {
             }
         }
 
-        // Kumpulkan data form
-        const formData = { period_id: activeProjectId, site_id: activeSiteId, technician_username: technicianUsername, ...photoUrls };
+        // Kumpulkan nilai dari semua input/select/textarea di form
+        const formData = { period_id: activeProjectId, site_id: activeSiteId, ...photoUrls };
         const inputs = document.getElementById('dynamic-form-fields').querySelectorAll('input, select, textarea');
         inputs.forEach(el => {
-            if (el.type === 'checkbox') { formData[el.id] = el.checked; }
-            else if (el.value) { formData[el.id] = el.value; }
+            if (!el.id) return;
+            const val = el.type === 'number' ? (el.value !== '' ? parseFloat(el.value) : null)
+                      : el.type === 'checkbox' ? el.checked
+                      : el.value || null;
+            // Hanya masukkan jika ada value, kecuali field nullable boleh null
+            if (val !== null && val !== '') formData[el.id] = val;
+            else if (el.value === '') formData[el.id] = null; // kirim null untuk field kosong
         });
 
+        // Hapus field helper yang bukan kolom tabel (odc selector di ODC form dipakai sebagai odc_id langsung)
+        // Pastikan odc_id & odp_id yang dikirim adalah UUID bukan kode teks
         await sbPost(def.table, formData);
         document.getElementById('success-modal').classList.remove('hidden');
 
@@ -733,8 +791,11 @@ function clearActiveProject() {
     checkProjectLifecycle();
 }
 
+// ============================================================
+// DROPDOWN ODC, ODP, CLOSURE, SPAN
+// ============================================================
 async function syncAndRenderOdcDropdown() {
-    const odcSelect = document.getElementById('kode_odc');
+    const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
     try {
         const odcMaster = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
@@ -742,31 +803,76 @@ async function syncAndRenderOdcDropdown() {
             odcSelect.innerHTML = '<option value="" disabled selected>Tidak ada ODC di wilayah ini</option>';
             return;
         }
-        odcSelect.innerHTML = '<option value="" disabled selected>Pilih Kode ODC</option>' +
-            odcMaster.map(o => `<option value="${o.odc_code}" data-db-id="${o.id}">${o.odc_code}</option>`).join('');
+        // Pertahankan opsi kosong jika field opsional
+        const isOptional = odcSelect.getAttribute('required') === null;
+        const firstOpt = isOptional ? '<option value="">— Tidak dipilih —</option>' : '<option value="" disabled selected>Pilih Kode ODC</option>';
+        odcSelect.innerHTML = firstOpt +
+            odcMaster.map(o => `<option value="${o.id}" data-code="${o.odc_code}">${o.odc_code}</option>`).join('');
+        odcSelect.disabled = false;
     } catch (err) {
         odcSelect.innerHTML = '<option value="" disabled selected>⚠️ Gagal memuat data ODC</option>';
     }
 }
 
 async function fetchOdpsForSelectedOdc() {
-    const odcSelect = document.getElementById('kode_odc');
-    const odpSelect = document.getElementById('kode_odp');
-    if (!odpSelect) return;
-    const odcDbId = odcSelect.options[odcSelect.selectedIndex]?.getAttribute('data-db-id');
-    if (!odcDbId) return;
+    const odcSelect = document.getElementById('odc_id');
+    const odpSelect = document.getElementById('odp_id');
+    if (!odpSelect || !odcSelect.value) return;
+    const odcDbId = odcSelect.value;
     odpSelect.disabled = false;
     odpSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODP...</option>';
     try {
         const odpMaster = await sb(`odp_master?odc_id=eq.${odcDbId}&is_active=eq.true&select=id,odp_code,total_port&order=odp_code`);
         if (odpMaster.length === 0) {
-            odpSelect.innerHTML = '<option value="" disabled selected>✅ Tidak ada ODP di ODC ini</option>';
+            odpSelect.innerHTML = '<option value="">Tidak ada ODP di ODC ini</option>';
         } else {
-            odpSelect.innerHTML = '<option value="" disabled selected>Pilih Kode ODP</option>' +
-                odpMaster.map(o => `<option value="${o.odp_code}">${o.odp_code} (${o.total_port || 8} Port)</option>`).join('');
+            const isRequired = odpSelect.hasAttribute('required');
+            const firstOpt = isRequired ? '<option value="" disabled selected>Pilih Kode ODP</option>' : '<option value="">— Tidak dipilih —</option>';
+            odpSelect.innerHTML = firstOpt +
+                odpMaster.map(o => `<option value="${o.id}">${o.odp_code} (${o.total_port || 8} Port)</option>`).join('');
         }
     } catch (err) {
         odpSelect.innerHTML = '<option value="" disabled selected>⚠️ Gagal memuat ODP</option>';
+    }
+}
+
+async function fetchClosuresForOdc() {
+    const odcSelect = document.getElementById('odc_id');
+    const closureSelect = document.getElementById('closure_id');
+    if (!closureSelect || !odcSelect.value) return;
+    const odcDbId = odcSelect.value;
+    closureSelect.disabled = false;
+    closureSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat Closure...</option>';
+    try {
+        const closures = await sb(`closure_master?odc_id=eq.${odcDbId}&is_active=eq.true&select=id,closure_code&order=closure_code`);
+        if (closures.length === 0) {
+            closureSelect.innerHTML = '<option value="" disabled selected>Tidak ada Closure di ODC ini</option>';
+        } else {
+            closureSelect.innerHTML = '<option value="" disabled selected>Pilih Kode Closure</option>' +
+                closures.map(c => `<option value="${c.id}">${c.closure_code}</option>`).join('');
+        }
+    } catch (err) {
+        closureSelect.innerHTML = '<option value="" disabled selected>⚠️ Gagal memuat Closure</option>';
+    }
+}
+
+async function fetchSpansForOdc() {
+    const odcSelect = document.getElementById('odc_id');
+    const spanSelect = document.getElementById('span_id');
+    if (!spanSelect || !odcSelect.value) return;
+    const odcDbId = odcSelect.value;
+    spanSelect.disabled = false;
+    spanSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat Span...</option>';
+    try {
+        const spans = await sb(`span_master?odc_id=eq.${odcDbId}&is_active=eq.true&select=id,span_code&order=span_code`);
+        if (spans.length === 0) {
+            spanSelect.innerHTML = '<option value="" disabled selected>Tidak ada Span di ODC ini</option>';
+        } else {
+            spanSelect.innerHTML = '<option value="" disabled selected>Pilih Kode Span</option>' +
+                spans.map(s => `<option value="${s.id}">${s.span_code}</option>`).join('');
+        }
+    } catch (err) {
+        spanSelect.innerHTML = '<option value="" disabled selected>⚠️ Gagal memuat Span</option>';
     }
 }
 
