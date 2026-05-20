@@ -191,9 +191,9 @@ app.post('/api/report/odc', upload.any(), async (req, res) => {
             return res.status(400).json({ success: false, message: 'ID Periode (project_id) wajib terisi.' });
         }
 
-        // PATCH: Baca site_id dari tabel maintenance_periods, bukan tabel projects
+        // PATCH: Baca site_id dari tabel projects
         const { data: periodData, error: periodError } = await supabase
-            .from('maintenance_periods')
+            .from('projects')
             .select('site_id')
             .eq('id', project_id)
             .single();
