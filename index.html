@@ -159,7 +159,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
         </div>
         <h4 class="text-lg font-black text-slate-900">Laporan Terkirim!</h4>
-        <p class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data berhasil tersimpan ke database Supabase.</p>
+        <p class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data & foto berhasil tersimpan ke database Supabase.</p>
         <button onclick="afterSuccessRedirect()" class="mt-5 w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Kembali ke Menu</button>
     </div>
 </div>
@@ -177,18 +177,25 @@
 </div>
 
 <script>
-const SUPABASE_URL_REST = 'https://bwfbntebndkbglmbziij.supabase.co/rest/v1';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU';
+const SUPABASE_URL       = 'https://bwfbntebndkbglmbziij.supabase.co';
+const SUPABASE_URL_REST  = `${SUPABASE_URL}/rest/v1`;
+const SUPABASE_ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU';
+const STORAGE_BUCKET     = 'laporan-foto';
 
 let currentActiveTask = 'home';
-let compressedBlobs = {};
-let activeProjectId = localStorage.getItem('famika_active_project_id') || '';
+let compressedBlobs   = {}; // { index: Blob }
+let activeProjectId   = localStorage.getItem('famika_active_project_id')   || '';
 let activeProjectName = localStorage.getItem('famika_active_project_name') || '';
-let activeSiteId = localStorage.getItem('famika_active_site_id') || '';
+let activeSiteId      = localStorage.getItem('famika_active_site_id')      || '';
+let technicianUserId  = null; // UUID dari tabel users (diambil saat login)
 
 const tg = window.Telegram?.WebApp;
 let technicianUsername = 'Teknisi Lapangan';
-if (tg) { tg.expand(); tg.ready(); const u = tg.initDataUnsafe?.user; if (u) technicianUsername = u.username || u.first_name || 'Teknisi Lapangan'; }
+if (tg) {
+    tg.expand(); tg.ready();
+    const u = tg.initDataUnsafe?.user;
+    if (u) technicianUsername = u.username || u.first_name || 'Teknisi Lapangan';
+}
 document.getElementById('tech-username').innerText = technicianUsername;
 
 // ============================================================
@@ -229,25 +236,16 @@ function fCard(...innerHtml) {
 }
 
 // ============================================================
-// DEFINISI FORM — SESUAI SPESIFIKASI LAPORAN
+// DEFINISI FORM
 // ============================================================
 const FORM_DEFINITIONS = {
-
-    // 1. PM ODC
-    // Tabel: pm_odc
-    // Field: tanggal, odc_id, kondisi, kegiatan, hasil_opm
-    // Foto: before_buka, before_tutup, after_buka, after_tutup, foto_opm
     form_odc: {
         title: 'Form PM ODC',
         subtitle: 'Preventif Box ODC & Redaman OPM',
         table: 'pm_odc',
-        photoLabels: [
-            'Before — Tutup',
-            'Before — Buka',
-            'After — Tutup',
-            'After — Buka',
-            'Foto OPM / Redaman'
-        ],
+        // photo_kind values sesuai urutan slot foto
+        photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
+        photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
         fields: () => fCard(
             fSectionTitle('Data PM ODC'),
             fDynSelect('odc_id','Kode ODC','Memuat daftar ODC...',true,'syncAndRenderOdcDropdown()'),
@@ -256,22 +254,12 @@ const FORM_DEFINITIONS = {
             fInput('hasil_opm','Hasil OPM (dBm)','Contoh: -18.97',true,'number')
         )
     },
-
-    // 2. PM ODP
-    // Tabel: pm_odp
-    // Field: tanggal, odc_id, odp_id, sisa_port, kondisi, kegiatan, hasil_opm
-    // Foto: before_buka, before_tutup, after_buka, after_tutup, foto_opm
     form_odp: {
         title: 'Form PM ODP',
         subtitle: 'Preventif Box ODP dengan Relasi ODC',
         table: 'pm_odp',
-        photoLabels: [
-            'Before — Tutup',
-            'Before — Buka',
-            'After — Tutup',
-            'After — Buka',
-            'Foto OPM / Redaman'
-        ],
+        photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
+        photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
         fields: () => fCard(
             fSectionTitle('Data PM ODP'),
             fDynSelect('odc_id','ODC Induk','Memuat daftar ODC...',true,'fetchOdpsForSelectedOdc()'),
@@ -282,16 +270,11 @@ const FORM_DEFINITIONS = {
             fInput('hasil_opm','Hasil OPM (dBm)','Contoh: -21.0',true,'number')
         )
     },
-
-    // 3. Closure
-    // Tabel: pm_closure
-    // Field: tanggal, closure_id (dropdown), segment (opsional), pembangunan (opsional),
-    //        kondisi_slack, kegiatan, catatan
-    // Foto: 1 foto
     form_closure: {
         title: 'Form Preventif Closure',
         subtitle: 'Pendataan Fisik Sambungan Closure Kabel',
         table: 'pm_closure',
+        photoKinds: ['foto_closure'],
         photoLabels: ['Foto Closure'],
         fields: () => fCard(
             fSectionTitle('Data Closure'),
@@ -300,19 +283,14 @@ const FORM_DEFINITIONS = {
             fInput('pembangunan','Pembangunan','Contoh: 2022',false),
             fSelect('kondisi_slack','Kondisi Slack',[{v:'BAIK',l:'Baik'},{v:'TIDAK BAIK',l:'Tidak Baik'}],true),
             fTextarea('kegiatan','Kegiatan','Contoh: Pemeriksaan fisik closure',true),
-            fTextarea('catatan','Catatan','Temuan lapangan, kondisi tambahan...',false)
+            fTextarea('catatan','Catatan','Temuan lapangan...',false)
         )
     },
-
-    // 4. Span Kabel
-    // Tabel: pm_span
-    // Field: tanggal, span_id (opsional), segment (opsional), pembangunan (opsional),
-    //        kondisi_slack, kegiatan, catatan
-    // Foto: 1 foto
     form_span: {
         title: 'Form Span Kabel',
         subtitle: 'Pemeriksaan Fisik Bentangan & Spare Kabel',
         table: 'pm_span',
+        photoKinds: ['foto_span'],
         photoLabels: ['Foto Span Kabel'],
         fields: () => fCard(
             fSectionTitle('Data Span Kabel'),
@@ -324,17 +302,11 @@ const FORM_DEFINITIONS = {
             fTextarea('catatan','Catatan','Temuan lapangan...',false)
         )
     },
-
-    // 5. Penanganan Gangguan
-    // Tabel: corrective_customer
-    // Field: tanggal, customer_name (NAMA), service_id (ID Pel), odc_id (opsional),
-    //        odp_id (opsional), port_no (opsional), action, material (opsional),
-    //        sn_ont_new (opsional), sn_ont_old (opsional), jam_mulai, jam_selesai
-    // Foto: before, after
     form_gangguan: {
         title: 'Form Penanganan Gangguan',
         subtitle: 'Perbaikan Kendala Jaringan Pelanggan',
         table: 'corrective_customer',
+        photoKinds: ['foto_before','foto_after'],
         photoLabels: ['Foto Before','Foto After'],
         fields: () => fCard(
             fSectionTitle('Data Pelanggan'),
@@ -355,20 +327,17 @@ const FORM_DEFINITIONS = {
             </div>`
         )
     },
-
-    // 6. Dismantling
-    // Tabel: dismantling_records
-    // Field: customer_name, service_id (boleh kosong), port_no, odp_id, sn_ont, no_hp, alamat
-    // Foto: foto serial number, foto rumah
     form_dismantling: {
         title: 'Form Dismantling (Cabut)',
         subtitle: 'Pencabutan Material & Dropcore Pelanggan',
         table: 'dismantling_records',
+        photoKinds: ['foto_sn_ont','foto_rumah'],
         photoLabels: ['Foto Serial Number ONT','Foto Rumah Pelanggan'],
         fields: () => fCard(
             fSectionTitle('Data Pelanggan'),
             fInput('customer_name','Nama Pelanggan','Nama lengkap',true),
-            fInput('service_id','ID Pelanggan','Boleh kosong jika tidak diketahui',false),
+            /* service_id WAJIB diisi — sesuai constraint NOT NULL di database */
+            fInput('service_id','ID Pelanggan','Contoh: A1234',true),
             fInput('no_hp','No. HP Pelanggan','Contoh: 081234567890',true,'tel'),
             fInput('alamat','Alamat Pelanggan','Alamat lengkap',true),
             fSectionTitle('Informasi Pencabutan'),
@@ -379,25 +348,12 @@ const FORM_DEFINITIONS = {
             fTextarea('catatan','Catatan / Keterangan','Kondisi material, alasan cabut...',false)
         )
     },
-
-    // 7. Aktivasi Pelanggan Baru (PSB)
-    // Tabel: psb_records
-    // Field: customer_name, service_id, port_no, odp_id, sn_ont, no_hp, alamat
-    // Foto: foto ODP, foto port ODP, foto redaman ODP, foto redaman akhir,
-    //       foto SN ONT, foto instalasi rumah, foto speedtest
     form_psb: {
         title: 'Form Aktivasi Baru (PSB)',
         subtitle: 'Pemasangan & Uji Redaman Pelanggan Baru',
         table: 'psb_records',
-        photoLabels: [
-            'Foto ODP',
-            'Foto Port ODP',
-            'Foto Redaman ODP',
-            'Foto Redaman Akhir',
-            'Foto Serial Number ONT',
-            'Foto Instalasi Rumah',
-            'Foto Speedtest'
-        ],
+        photoKinds: ['foto_odp','foto_port_odp','foto_redaman_odp','foto_redaman_akhir','foto_sn_ont','foto_instalasi','foto_speedtest'],
+        photoLabels: ['Foto ODP','Foto Port ODP','Foto Redaman ODP','Foto Redaman Akhir','Foto Serial Number ONT','Foto Instalasi Rumah','Foto Speedtest'],
         fields: () => fCard(
             fSectionTitle('Data Pelanggan Baru'),
             fInput('customer_name','Nama Pelanggan','Nama lengkap',true),
@@ -417,7 +373,7 @@ const FORM_DEFINITIONS = {
 };
 
 // ============================================================
-// FUNGSI NAVIGASI VIEW
+// NAVIGASI VIEW
 // ============================================================
 function showView(viewName) {
     currentActiveTask = viewName;
@@ -425,7 +381,7 @@ function showView(viewName) {
     document.getElementById('view-home').classList.add('hidden');
     document.getElementById('pm-form').classList.add('hidden');
 
-    const backBtn = document.getElementById('btn-back-home');
+    const backBtn       = document.getElementById('btn-back-home');
     const logoContainer = document.getElementById('header-logo-container');
 
     if (viewName === 'home') {
@@ -441,7 +397,7 @@ function showView(viewName) {
     const def = FORM_DEFINITIONS[viewName];
     if (!def) return;
 
-    document.getElementById('header-title').innerText = def.title;
+    document.getElementById('header-title').innerText   = def.title;
     document.getElementById('header-subtitle').innerText = def.subtitle;
     backBtn.classList.remove('hidden');
     logoContainer.classList.add('hidden');
@@ -464,18 +420,16 @@ function showView(viewName) {
 
     document.getElementById('pm-form').classList.remove('hidden');
 
-    // Load dropdown sesuai form
     const needsOdc = ['form_odc','form_odp','form_gangguan','form_dismantling','form_psb'];
     if (needsOdc.includes(viewName)) syncAndRenderOdcDropdown();
-
     if (viewName === 'form_closure') loadAllClosures();
-    if (viewName === 'form_span') loadAllSpans();
+    if (viewName === 'form_span')    loadAllSpans();
 
     window.scrollTo(0, 0);
 }
 
 // ============================================================
-// HANDLER FOTO
+// HANDLER FOTO — COMPRESS SEBELUM UPLOAD
 // ============================================================
 function handlePhotoSelect(event, index) {
     const file = event.target.files[0];
@@ -503,34 +457,24 @@ function handlePhotoSelect(event, index) {
 }
 
 // ============================================================
-// SUBMIT FORM
+// SUBMIT — OPSI A: PHOTO_ASSETS TERPUSAT
+// Alur:
+//   1. Insert data utama ke tabel (pm_odc, pm_odp, dst.) → dapat record_id
+//   2. Upload tiap foto ke Storage (laporan-foto bucket)
+//   3. Insert satu baris ke photo_assets per foto
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
     const def = FORM_DEFINITIONS[currentActiveTask];
     if (!def) return;
 
-    document.getElementById('btn-text').innerText = 'Mengirim...';
+    document.getElementById('btn-text').innerText = 'Menyimpan data...';
     document.getElementById('loading-spinner').classList.remove('hidden');
     document.getElementById('submit-btn').disabled = true;
 
     try {
-        // Upload foto
-        const photoKeys = def.photoLabels.map(l => l.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''));
-        const photoUrls = {};
-        for (const [idx, blob] of Object.entries(compressedBlobs)) {
-            const key = photoKeys[parseInt(idx)] || `foto_${parseInt(idx)+1}`;
-            const filename = `${activeProjectId}/${currentActiveTask}_${Date.now()}_${idx}.jpg`;
-            const uploadRes = await fetch(`https://bwfbntebndkbglmbziij.supabase.co/storage/v1/object/laporan-foto/${filename}`, {
-                method: 'POST',
-                headers: {'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true'},
-                body: blob
-            });
-            if (uploadRes.ok) photoUrls[key] = `https://bwfbntebndkbglmbziij.supabase.co/storage/v1/object/public/laporan-foto/${filename}`;
-        }
-
-        // Kumpulkan data form
-        const formData = { period_id: activeProjectId, site_id: activeSiteId, ...photoUrls };
+        // --- LANGKAH 1: Kumpulkan data form (tanpa foto) ---
+        const formData = { period_id: activeProjectId, site_id: activeSiteId };
         document.getElementById('dynamic-form-fields').querySelectorAll('input,select,textarea').forEach(el => {
             if (!el.id) return;
             let val;
@@ -540,8 +484,73 @@ async function handleSubmit(event) {
             formData[el.id] = val;
         });
 
-        await sbPost(def.table, formData);
+        // Isi technician_id berdasarkan username
+        if (technicianUserId) {
+            formData.technician_id = technicianUserId;
+        } else {
+            const uData = await sb(`users?full_name=ilike.${encodeURIComponent('%'+technicianUsername+'%')}&select=id&limit=1`);
+            if (uData?.[0]?.id) { technicianUserId = uData[0].id; formData.technician_id = technicianUserId; }
+        }
+
+        // --- LANGKAH 2: Insert data utama → dapat record_id ---
+        document.getElementById('btn-text').innerText = 'Menyimpan laporan...';
+        const inserted = await sbPost(def.table, formData);
+        const recordId = inserted?.[0]?.id;
+        if (!recordId) throw new Error('Gagal mendapatkan ID record yang disimpan.');
+
+        // --- LANGKAH 3: Upload foto & insert ke photo_assets ---
+        const photoKinds    = def.photoKinds || [];
+        const uploadEntries = Object.entries(compressedBlobs);
+        if (uploadEntries.length > 0) {
+            document.getElementById('btn-text').innerText = `Mengupload foto (0/${uploadEntries.length})...`;
+        }
+
+        const photoAssets = [];
+        for (let i = 0; i < uploadEntries.length; i++) {
+            const [idxStr, blob] = uploadEntries[i];
+            const idx       = parseInt(idxStr);
+            const photoKind = photoKinds[idx] || `foto_${idx + 1}`;
+            const filename  = `${currentActiveTask}/${activeProjectId}/${recordId}_${photoKind}_${Date.now()}.jpg`;
+
+            document.getElementById('btn-text').innerText = `Mengupload foto (${i+1}/${uploadEntries.length})...`;
+
+            const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filename}`, {
+                method: 'POST',
+                headers: {
+                    'apikey'       : SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type' : 'image/jpeg',
+                    'x-upsert'     : 'true'
+                },
+                body: blob
+            });
+
+            if (!uploadRes.ok) {
+                console.warn(`Upload foto ${photoKind} gagal, lanjut...`);
+                continue;
+            }
+
+            const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filename}`;
+            photoAssets.push({
+                module_name : currentActiveTask,
+                record_id   : recordId,
+                photo_kind  : photoKind,
+                file_path   : filename,
+                file_name   : `${photoKind}_${Date.now()}.jpg`,
+                mime_type   : 'image/jpeg',
+                file_size   : blob.size,
+                uploaded_by : technicianUserId || null
+            });
+        }
+
+        // Batch insert ke photo_assets
+        if (photoAssets.length > 0) {
+            document.getElementById('btn-text').innerText = 'Menyimpan metadata foto...';
+            await sbPost('photo_assets', photoAssets);
+        }
+
         document.getElementById('success-modal').classList.remove('hidden');
+
     } catch (err) {
         showErrorModal('Gagal mengirim: ' + err.message);
     } finally {
@@ -568,15 +577,20 @@ function closeErrorModal() {
 // ============================================================
 async function sb(endpoint) {
     const res = await fetch(`${SUPABASE_URL_REST}/${endpoint}`, {
-        headers: {"apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}`}
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
     });
     if (!res.ok) throw new Error(`Fetch gagal: ${endpoint}`);
     return res.json();
 }
 async function sbPost(table, body) {
     const res = await fetch(`${SUPABASE_URL_REST}/${table}`, {
-        method: 'POST',
-        headers: {"apikey": SUPABASE_ANON_KEY, "Authorization": `Bearer ${SUPABASE_ANON_KEY}`, "Content-Type": "application/json", "Prefer": "return=representation"},
+        method : 'POST',
+        headers: {
+            'apikey'       : SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type' : 'application/json',
+            'Prefer'       : 'return=representation'
+        },
         body: JSON.stringify(body)
     });
     const data = await res.json();
@@ -594,7 +608,7 @@ function checkProjectLifecycle() {
         document.getElementById('pm-form').classList.add('hidden');
         document.getElementById('btn-back-home').classList.add('hidden');
         document.getElementById('header-logo-container').classList.remove('hidden');
-        document.getElementById('header-title').innerText = 'PM TELECOM PORTAL';
+        document.getElementById('header-title').innerText    = 'PM TELECOM PORTAL';
         document.getElementById('header-subtitle').innerText = 'Langkah Awal: Pilih Project Kerja';
         fetchSitesAndProjects();
     } else {
@@ -605,20 +619,20 @@ function toggleProjectTab(tab) {
     const btnSelect = document.getElementById('tab-btn-select');
     const btnCreate = document.getElementById('tab-btn-create');
     if (tab === 'select') {
-        btnSelect.className = "bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all";
-        btnCreate.className = "text-slate-500 py-2.5 rounded-lg transition-all";
+        btnSelect.className = 'bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all';
+        btnCreate.className = 'text-slate-500 py-2.5 rounded-lg transition-all';
         document.getElementById('project-panel-select').classList.remove('hidden');
         document.getElementById('project-panel-create').classList.add('hidden');
         fetchSitesAndProjects();
     } else {
-        btnCreate.className = "bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all";
-        btnSelect.className = "text-slate-500 py-2.5 rounded-lg transition-all";
+        btnCreate.className = 'bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all';
+        btnSelect.className = 'text-slate-500 py-2.5 rounded-lg transition-all';
         document.getElementById('project-panel-create').classList.remove('hidden');
         document.getElementById('project-panel-select').classList.add('hidden');
     }
 }
 async function fetchSitesAndProjects() {
-    const selectEl = document.getElementById('select_active_project');
+    const selectEl     = document.getElementById('select_active_project');
     const siteSelectEl = document.getElementById('new_project_site');
     try {
         const sites = await sb('sites?is_active=eq.true&select=id,site_code,region&order=site_code');
@@ -635,9 +649,9 @@ async function fetchSitesAndProjects() {
 }
 async function activateSelectedProject() {
     const selectEl = document.getElementById('select_active_project');
-    const opt = selectEl.options[selectEl.selectedIndex];
+    const opt      = selectEl.options[selectEl.selectedIndex];
     if (!selectEl.value) { showErrorModal('Pilih project terlebih dahulu.'); return; }
-    activeProjectId = selectEl.value;
+    activeProjectId   = selectEl.value;
     activeProjectName = opt.getAttribute('data-name');
     let siteId = opt.getAttribute('data-site-id');
     if (!siteId) {
@@ -646,27 +660,35 @@ async function activateSelectedProject() {
         siteId = siteData?.[0]?.id || '';
     }
     activeSiteId = siteId;
-    localStorage.setItem('famika_active_project_id', activeProjectId);
+    localStorage.setItem('famika_active_project_id',   activeProjectId);
     localStorage.setItem('famika_active_project_name', activeProjectName);
-    localStorage.setItem('famika_active_site_id', activeSiteId);
+    localStorage.setItem('famika_active_site_id',      activeSiteId);
     checkProjectLifecycle();
 }
 async function createNewProject() {
-    const name = document.getElementById('new_project_name').value.trim();
-    const bulan = document.getElementById('new_project_bulan').value;
-    const tahun = document.getElementById('new_project_tahun').value;
+    const name       = document.getElementById('new_project_name').value.trim();
+    const bulan      = document.getElementById('new_project_bulan').value;
+    const tahun      = document.getElementById('new_project_tahun').value;
     const siteSelect = document.getElementById('new_project_site');
-    const siteCode = siteSelect.value;
-    const siteId = siteSelect.options[siteSelect.selectedIndex]?.getAttribute('data-id') || '';
+    const siteCode   = siteSelect.value;
+    const siteId     = siteSelect.options[siteSelect.selectedIndex]?.getAttribute('data-id') || '';
     if (!name || !siteCode) { showErrorModal('Lengkapi semua isian.'); return; }
     try {
-        const result = await sbPost('projects', {project_name: name, site_code: siteCode, site_id: siteId, bulan: parseInt(bulan), tahun: parseInt(tahun), status: 'active', technician_username: technicianUsername});
-        activeProjectId = result[0].id;
+        const result = await sbPost('projects', {
+            project_name       : name,
+            site_code          : siteCode,
+            site_id            : siteId,
+            bulan              : parseInt(bulan),
+            tahun              : parseInt(tahun),
+            status             : 'active',
+            technician_username: technicianUsername
+        });
+        activeProjectId   = result[0].id;
         activeProjectName = result[0].project_name;
-        activeSiteId = result[0].site_id || siteId;
-        localStorage.setItem('famika_active_project_id', activeProjectId);
+        activeSiteId      = result[0].site_id || siteId;
+        localStorage.setItem('famika_active_project_id',   activeProjectId);
         localStorage.setItem('famika_active_project_name', activeProjectName);
-        localStorage.setItem('famika_active_site_id', activeSiteId);
+        localStorage.setItem('famika_active_site_id',      activeSiteId);
         checkProjectLifecycle();
     } catch (err) { showErrorModal('Gagal buat project: ' + err.message); }
 }
