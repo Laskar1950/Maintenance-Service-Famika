@@ -243,11 +243,8 @@ const FORM_DEFINITIONS = {
         title: 'Form PM ODC',
         subtitle: 'Preventif Box ODC & Redaman OPM',
         table: 'pm_odc',
-        // photo_kind values sesuai urutan slot foto
         photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
         photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
-        // FIX BUG #1: hapus onchange dari odc_id di form_odc
-        // syncAndRenderOdcDropdown() sudah dipanggil otomatis di showView(), tidak perlu di onchange
         fields: () => fCard(
             fSectionTitle('Data PM ODC'),
             fDynSelect('odc_id','Kode ODC','Pilih Kode ODC',true),
@@ -338,7 +335,6 @@ const FORM_DEFINITIONS = {
         fields: () => fCard(
             fSectionTitle('Data Pelanggan'),
             fInput('customer_name','Nama Pelanggan','Nama lengkap',true),
-            /* service_id WAJIB diisi — sesuai constraint NOT NULL di database */
             fInput('service_id','ID Pelanggan','Contoh: A1234',true),
             fInput('no_hp','No. HP Pelanggan','Contoh: 081234567890',true,'tel'),
             fInput('alamat','Alamat Pelanggan','Alamat lengkap',true),
@@ -459,27 +455,11 @@ function handlePhotoSelect(event, index) {
 }
 
 // ============================================================
-// FIX BUG #2: Cek duplikat data sebelum insert
-// Untuk pm_odc: cek kombinasi period_id + odc_id
-// Untuk pm_odp: cek kombinasi period_id + odp_id
-// ============================================================
-async function checkDuplicate(table, periodId, fieldName, fieldValue) {
-    if (!fieldValue) return false;
-    try {
-        const data = await sb(`${table}?period_id=eq.${periodId}&${fieldName}=eq.${fieldValue}&select=id&limit=1`);
-        return data && data.length > 0;
-    } catch {
-        return false;
-    }
-}
-
-// ============================================================
-// SUBMIT — OPSI A: PHOTO_ASSETS TERPUSAT
+// SUBMIT
 // Alur:
-//   1. Cek duplikat (untuk pm_odc & pm_odp)
-//   2. Insert data utama ke tabel (pm_odc, pm_odp, dst.) → dapat record_id
-//   3. Upload tiap foto ke Storage (laporan-foto bucket)
-//   4. Insert satu baris ke photo_assets per foto
+//   1. Insert data utama ke tabel → dapat record_id
+//   2. Upload tiap foto ke Storage
+//   3. Insert satu baris ke photo_assets per foto
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
@@ -501,30 +481,6 @@ async function handleSubmit(event) {
             else val = el.value || null;
             formData[el.id] = val;
         });
-
-        // --- FIX BUG #2: Validasi duplikat untuk pm_odc dan pm_odp ---
-        if (currentActiveTask === 'form_odc') {
-            const odcId = formData['odc_id'];
-            if (!odcId) { throw new Error('Pilih Kode ODC terlebih dahulu.'); }
-            const isDuplicate = await checkDuplicate('pm_odc', activeProjectId, 'odc_id', odcId);
-            if (isDuplicate) {
-                // Ambil label ODC untuk pesan error yang informatif
-                const odcEl = document.getElementById('odc_id');
-                const odcLabel = odcEl?.options[odcEl.selectedIndex]?.text || odcId;
-                throw new Error(`Data PM ODC untuk "${odcLabel}" sudah pernah diinput pada project ini. Setiap ODC hanya boleh diinput 1x per project.`);
-            }
-        }
-
-        if (currentActiveTask === 'form_odp') {
-            const odpId = formData['odp_id'];
-            if (!odpId) { throw new Error('Pilih Kode ODP terlebih dahulu.'); }
-            const isDuplicate = await checkDuplicate('pm_odp', activeProjectId, 'odp_id', odpId);
-            if (isDuplicate) {
-                const odpEl = document.getElementById('odp_id');
-                const odpLabel = odpEl?.options[odpEl.selectedIndex]?.text || odpId;
-                throw new Error(`Data PM ODP untuk "${odpLabel}" sudah pernah diinput pada project ini. Setiap ODP hanya boleh diinput 1x per project.`);
-            }
-        }
 
         // Isi technician_id berdasarkan username
         if (technicianUserId) {
@@ -745,17 +701,55 @@ function clearActiveProject() {
 // ============================================================
 // DROPDOWN LOADERS
 // ============================================================
+
+/**
+ * syncAndRenderOdcDropdown:
+ * Load semua ODC aktif di site ini, lalu FILTER yang sudah
+ * diinput di pm_odc untuk project aktif → tidak ditampilkan.
+ * Hanya berlaku di form_odc. Form lain (gangguan, dismantling,
+ * psb) tidak perlu filter karena ODC boleh berulang di sana.
+ */
 async function syncAndRenderOdcDropdown() {
     const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
     odcSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODC...</option>';
     try {
-        const data = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
+        // Ambil semua ODC aktif di site ini
+        const allOdc = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
+
+        // Jika form ODC: filter yang sudah diinput di project ini
+        let usedOdcIds = new Set();
+        if (currentActiveTask === 'form_odc' && activeProjectId) {
+            try {
+                const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`);
+                used.forEach(r => usedOdcIds.add(r.odc_id));
+            } catch { /* abaikan error filter, tampilkan semua */ }
+        }
+
         const isRequired = odcSelect.hasAttribute('required');
-        const first = isRequired ? '<option value="" disabled selected>Pilih Kode ODC</option>' : '<option value="">— Tidak dipilih —</option>';
-        odcSelect.innerHTML = first + data.map(o => `<option value="${o.id}">${o.odc_code}</option>`).join('');
-    } catch { odcSelect.innerHTML = '<option value="">⚠️ Gagal memuat</option>'; }
+        const firstOpt   = isRequired
+            ? '<option value="" disabled selected>Pilih Kode ODC</option>'
+            : '<option value="">— Tidak dipilih —</option>';
+
+        // Filter: hapus ODC yang sudah diinput
+        const available = allOdc.filter(o => !usedOdcIds.has(o.id));
+
+        if (currentActiveTask === 'form_odc' && available.length === 0) {
+            odcSelect.innerHTML = '<option value="" disabled selected>✅ Semua ODC sudah diinput</option>';
+        } else {
+            odcSelect.innerHTML = firstOpt + available.map(o => `<option value="${o.id}">${o.odc_code}</option>`).join('');
+        }
+    } catch {
+        odcSelect.innerHTML = '<option value="">⚠️ Gagal memuat</option>';
+    }
 }
+
+/**
+ * fetchOdpsForSelectedOdc:
+ * Load ODP berdasarkan ODC yang dipilih, lalu FILTER yang
+ * sudah diinput di pm_odp untuk project aktif → tidak ditampilkan.
+ * Hanya berlaku di form_odp. Form lain tidak difilter.
+ */
 async function fetchOdpsForSelectedOdc() {
     const odcSelect = document.getElementById('odc_id');
     const odpSelect = document.getElementById('odp_id');
@@ -763,12 +757,36 @@ async function fetchOdpsForSelectedOdc() {
     odpSelect.disabled = false;
     odpSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODP...</option>';
     try {
-        const data = await sb(`odp_master?odc_id=eq.${odcSelect.value}&is_active=eq.true&select=id,odp_code,total_port&order=odp_code`);
+        // Ambil semua ODP aktif di bawah ODC ini
+        const allOdp = await sb(`odp_master?odc_id=eq.${odcSelect.value}&is_active=eq.true&select=id,odp_code,total_port&order=odp_code`);
+
+        // Jika form ODP: filter yang sudah diinput di project ini
+        let usedOdpIds = new Set();
+        if (currentActiveTask === 'form_odp' && activeProjectId) {
+            try {
+                const used = await sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`);
+                used.forEach(r => usedOdpIds.add(r.odp_id));
+            } catch { /* abaikan error filter, tampilkan semua */ }
+        }
+
         const isRequired = odpSelect.hasAttribute('required');
-        const first = isRequired ? '<option value="" disabled selected>Pilih Kode ODP</option>' : '<option value="">— Tidak dipilih —</option>';
-        odpSelect.innerHTML = first + data.map(o => `<option value="${o.id}">${o.odp_code} (${o.total_port||8} Port)</option>`).join('');
-    } catch { odpSelect.innerHTML = '<option value="">⚠️ Gagal memuat ODP</option>'; }
+        const firstOpt   = isRequired
+            ? '<option value="" disabled selected>Pilih Kode ODP</option>'
+            : '<option value="">— Tidak dipilih —</option>';
+
+        // Filter: hapus ODP yang sudah diinput
+        const available = allOdp.filter(o => !usedOdpIds.has(o.id));
+
+        if (currentActiveTask === 'form_odp' && available.length === 0) {
+            odpSelect.innerHTML = '<option value="" disabled selected>✅ Semua ODP sudah diinput</option>';
+        } else {
+            odpSelect.innerHTML = firstOpt + available.map(o => `<option value="${o.id}">${o.odp_code} (${o.total_port||8} Port)</option>`).join('');
+        }
+    } catch {
+        odpSelect.innerHTML = '<option value="">⚠️ Gagal memuat ODP</option>';
+    }
 }
+
 async function loadAllClosures() {
     const sel = document.getElementById('closure_id');
     if (!sel) return;
