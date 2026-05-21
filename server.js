@@ -374,9 +374,11 @@ app.get('/api/report/export', async (req, res) => {
                             const ext = (asset.fileName || '').toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
                             const imgId = workbook.addImage({ buffer: asset.buffer, extension: ext });
 
+                            // FIX: Hapus colOff/rowOff — nilai EMU kecil/negatif menyebabkan
+                            // gambar tidak ter-render di Excel/Google Sheets.
                             ws.addImage(imgId, {
-                                tl: { col: pf.col - 1, row: curRow - 1, colOff: 6, rowOff: 6 },
-                                br: { col: pf.col,     row: curRow,     colOff: -6, rowOff: -6 },
+                                tl: { col: pf.col - 1, row: curRow - 1 },
+                                br: { col: pf.col,     row: curRow     },
                                 editAs: 'oneCell'
                             });
                             cell.value = '';
