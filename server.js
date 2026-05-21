@@ -19,6 +19,9 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+// ─── NAMA BUCKET STORAGE (SATU SUMBER KEBENARAN) ─────────────────────────────
+const STORAGE_BUCKET = 'laporan-foto';
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -127,12 +130,12 @@ async function getClosureId(kodeClosure, siteId) {
     return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
 }
 
-async function getSpanId(kodeClosure, siteId) {
-    if (kodeClosure) {
+async function getSpanId(kodeSpan, siteId) {
+    if (kodeSpan) {
         const { data } = await supabase
             .from('span_master')
             .select('id')
-            .eq('span_code', kodeClosure)
+            .eq('span_code', kodeSpan)
             .limit(1);
         if (data && data.length > 0) return data[0].id;
     }
@@ -151,11 +154,12 @@ async function getSpanId(kodeClosure, siteId) {
 }
 
 // --- FUNGSI UTAMA KOMPRESI DAN UNGGAH KE STORAGE BUCKET ---
-// PATCH: diperbaiki menjadi 4 parameter (bukan 5 seperti sebelumnya)
 async function compressAndUpload(fileBuffer, fieldName, taskType, projectId) {
     const folderName = taskType.replace('form_', '');
     const fileName = `${fieldName}-${Date.now()}.jpg`;
-    const fullPath = `${projectId}/${folderName}/${fileName}`;
+    // Path diseragamkan dengan format yang dipakai index.html:
+    // {taskType}/{projectId}/{fileName}
+    const fullPath = `${taskType}/${projectId}/${fileName}`;
 
     const compressedBuffer = await sharp(fileBuffer)
         .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
@@ -163,7 +167,7 @@ async function compressAndUpload(fileBuffer, fieldName, taskType, projectId) {
         .toBuffer();
 
     const { error } = await supabase.storage
-        .from('maintenance-photos')
+        .from(STORAGE_BUCKET)           // ← gunakan konstanta
         .upload(fullPath, compressedBuffer, {
             contentType: 'image/jpeg',
             upsert: true
@@ -191,7 +195,6 @@ app.post('/api/report/odc', upload.any(), async (req, res) => {
             return res.status(400).json({ success: false, message: 'ID Periode (project_id) wajib terisi.' });
         }
 
-        // PATCH: Baca site_id dari tabel projects
         const { data: periodData, error: periodError } = await supabase
             .from('projects')
             .select('site_id')
@@ -316,7 +319,6 @@ app.post('/api/report/odc', upload.any(), async (req, res) => {
 
         const photoAssetInserts = [];
         for (const file of files) {
-            // PATCH: compressAndUpload dipanggil dengan 4 argumen yang benar
             const uploadResult = await compressAndUpload(
                 file.buffer,
                 file.fieldname,
@@ -377,14 +379,11 @@ app.get('/api/report/export', async (req, res) => {
             return res.status(404).send('<h1>Error: Project kerja bulanan tidak ditemukan!</h1>');
         }
 
-        // Parse format Bulan (angka -> teks Indonesia)
-        const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        const namaBulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
         const stringBulanText = `${namaBulan[project.bulan - 1]} ${project.tahun}`;
 
         // 2. Tarik Semua Data Master untuk Lookup Cepat di Memori
-        const [{ data: sites }, { data: users }, { data: odcMaster }, { data: odpMaster }, { data: closureMaster }, { data: spanMaster }] = await Promise.all([
-            supabase.from('sites').select('*'),
-            supabase.from('users').select('*'),
+        const [{ data: odcMaster }, { data: odpMaster }, { data: closureMaster }, { data: spanMaster }] = await Promise.all([
             supabase.from('odc_master').select('*'),
             supabase.from('odp_master').select('*'),
             supabase.from('closure_master').select('*'),
@@ -402,8 +401,10 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('psb_records').select('*').eq('period_id', project_id)
         ]);
 
-        // 4. Tarik Log Semua Media Foto
-        const { data: photos } = await supabase.from('photo_assets').select('*');
+        // 4. Tarik Log Semua Media Foto lalu buat map record_id → [assets]
+        const { data: photos } = await supabase
+            .from('photo_assets')
+            .select('*');
         const photoMap = {};
         if (photos) {
             photos.forEach(p => {
@@ -417,38 +418,26 @@ app.get('/api/report/export', async (req, res) => {
         workbook.creator = 'Famika PM Telecom Portal';
         workbook.created = new Date();
 
-        // --- STYLING PATTERNS ---
         const tableHeaderFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF85D3F2' } };
         const borderStyle = {
-            top: { style: 'thin', color: { argb: '000000' } },
+            top:    { style: 'thin', color: { argb: '000000' } },
             bottom: { style: 'thin', color: { argb: '000000' } },
-            left: { style: 'thin', color: { argb: '000000' } },
-            right: { style: 'thin', color: { argb: '000000' } }
+            left:   { style: 'thin', color: { argb: '000000' } },
+            right:  { style: 'thin', color: { argb: '000000' } }
         };
-
         const globalFont = { name: 'Arial', size: 10 };
-        const boldFont = { name: 'Arial', size: 10, bold: true };
+        const boldFont   = { name: 'Arial', size: 10, bold: true };
 
         function applyBordersToRange(ws, startCol, startRow, endCol, endRow) {
             for (let r = startRow; r <= endRow; r++) {
                 const wsRow = ws.getRow(r);
                 for (let c = startCol; c <= endCol; c++) {
-                    const cell = wsRow.getCell(c);
-                    cell.border = borderStyle;
+                    wsRow.getCell(c).border = borderStyle;
                 }
             }
         }
 
-        async function buildReportSheet({
-            sheetName,
-            isCorrective = false,
-            columnsSetup,
-            headers_r5,
-            headers_r6,
-            mergeSpecs,
-            rowsData,
-            photoFields
-        }) {
+        async function buildReportSheet({ sheetName, isCorrective = false, columnsSetup, headers_r5, headers_r6, mergeSpecs, rowsData, photoFields }) {
             const ws = workbook.addWorksheet(sheetName);
             ws.views = [{ showGridLines: true }];
 
@@ -473,8 +462,8 @@ app.get('/api/report/export', async (req, res) => {
             headers_r5.forEach((val, i) => {
                 const cell = r5.getCell(i + 1);
                 cell.value = val;
-                cell.font = boldFont;
-                cell.fill = tableHeaderFill;
+                cell.font  = boldFont;
+                cell.fill  = tableHeaderFill;
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
 
@@ -483,8 +472,8 @@ app.get('/api/report/export', async (req, res) => {
             headers_r6.forEach((val, i) => {
                 const cell = r6.getCell(i + 1);
                 cell.value = val;
-                cell.font = boldFont;
-                cell.fill = tableHeaderFill;
+                cell.font  = boldFont;
+                cell.fill  = tableHeaderFill;
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
 
@@ -498,43 +487,43 @@ app.get('/api/report/export', async (req, res) => {
                 r.data.forEach((val, colIdx) => {
                     const cell = wsRow.getCell(colIdx + 1);
                     cell.value = val;
-                    cell.font = globalFont;
-                    const alignHoriz = columnsSetup.alignments[colIdx] || 'left';
-                    cell.alignment = { vertical: 'middle', horizontal: alignHoriz, wrapText: true };
+                    cell.font  = globalFont;
+                    cell.alignment = { vertical: 'middle', horizontal: columnsSetup.alignments[colIdx] || 'left', wrapText: true };
                 });
 
                 for (const pf of photoFields) {
                     const assets = photoMap[r.id] || [];
+                    // photo_kind di DB diseragamkan: tanpa prefix 'photo_'
                     const asset = assets.find(a => a.photo_kind === pf.field);
-                    const cell = wsRow.getCell(pf.col);
+                    const cell  = wsRow.getCell(pf.col);
                     cell.alignment = { vertical: 'middle', horizontal: 'center' };
 
                     if (asset) {
                         try {
                             const { data: fileData, error: dlErr } = await supabase.storage
-                                .from('maintenance-photos')
+                                .from(STORAGE_BUCKET)       // ← pakai konstanta
                                 .download(asset.file_path);
 
                             if (!dlErr && fileData) {
                                 const buffer = Buffer.from(await fileData.arrayBuffer());
-                                const imgId = workbook.addImage({ buffer: buffer, extension: 'jpeg' });
+                                const imgId  = workbook.addImage({ buffer, extension: 'jpeg' });
                                 ws.addImage(imgId, {
                                     tl: { col: pf.col - 1, row: curRow - 1, colOff: 6, rowOff: 6 },
-                                    br: { col: pf.col, row: curRow, colOff: -6, rowOff: -6 },
+                                    br: { col: pf.col,     row: curRow,     colOff: -6, rowOff: -6 },
                                     editAs: 'oneCell'
                                 });
                                 cell.value = '';
                             } else {
                                 cell.value = 'Foto Gagal';
-                                cell.font = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
+                                cell.font  = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
                             }
                         } catch (e) {
                             cell.value = 'Eror Foto';
-                            cell.font = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
+                            cell.font  = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
                         }
                     } else {
                         cell.value = 'Tidak Ada';
-                        cell.font = { name: 'Arial', size: 8, color: { argb: '94A3B8' } };
+                        cell.font  = { name: 'Arial', size: 8, color: { argb: '94A3B8' } };
                     }
                 }
                 curRow++;
@@ -544,122 +533,171 @@ app.get('/api/report/export', async (req, res) => {
         }
 
         // ── SHEET 1: ODC ──────────────────────────────────────────────────────────
-        const odc_widths = [6, 12, 18, 10, 15, 24, 24, 24, 24, 24, 12];
-        const odc_aligns = ['center','center','center','center','center','center','center','center','center','center','center'];
-        const odc_r5 = ['NO','TANGGAL','ODC','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''];
-        const odc_r6 = ['','','','','','BUKA','TUTUP','BUKA','TUTUP','FOTO','REDAMAN'];
-        const odc_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:G5','H5:I5','J5:K5'];
-        const odc_rows = (pmOdc || []).map((item, idx) => {
-            const code = odcMaster.find(o => o.id === item.odc_id)?.odc_code || 'N/A';
-            return { id: item.id, data: [idx+1, item.tanggal, code, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm] };
+        await buildReportSheet({
+            sheetName: 'ODC',
+            columnsSetup: {
+                widths:     [6, 12, 18, 10, 15, 24, 24, 24, 24, 24, 12],
+                alignments: ['center','center','center','center','center','center','center','center','center','center','center']
+            },
+            headers_r5: ['NO','TANGGAL','ODC','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
+            headers_r6: ['','','','','','BUKA','TUTUP','BUKA','TUTUP','FOTO','REDAMAN'],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:G5','H5:I5','J5:K5'],
+            rowsData: (pmOdc || []).map((item, idx) => ({
+                id: item.id,
+                data: [idx+1, item.tanggal, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A', item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
+            })),
+            // photo_kind dikirim index.html: 'before_buka', 'before_tutup', 'after_buka', 'after_tutup', 'foto_opm'
+            photoFields: [
+                { field: 'before_buka',  col: 6 },
+                { field: 'before_tutup', col: 7 },
+                { field: 'after_buka',   col: 8 },
+                { field: 'after_tutup',  col: 9 },
+                { field: 'foto_opm',     col: 10 }
+            ]
         });
-        const odc_photos = [
-            { field: 'photo_before_buka', col: 6 }, { field: 'photo_before_tutup', col: 7 },
-            { field: 'photo_after_buka', col: 8 },  { field: 'photo_after_tutup', col: 9 },
-            { field: 'photo_opm', col: 10 }
-        ];
-        await buildReportSheet({ sheetName: 'ODC', columnsSetup: { widths: odc_widths, alignments: odc_aligns }, headers_r5: odc_r5, headers_r6: odc_r6, mergeSpecs: odc_merges, rowsData: odc_rows, photoFields: odc_photos });
 
         // ── SHEET 2: ODP ──────────────────────────────────────────────────────────
-        const odp_widths = [6, 12, 18, 18, 12, 10, 15, 24, 24, 24, 24, 24, 12];
-        const odp_aligns = ['center','center','center','center','center','center','center','center','center','center','center','center','center'];
-        const odp_r5 = ['NO','TANGGAL','ODC','ODP','SISA PORT','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''];
-        const odp_r6 = ['','','','','','','','TUTUP','BUKA','TUTUP','BUKA','FOTO','REDAMAN'];
-        const odp_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:I5','J5:K5','L5:M5'];
-        const odp_rows = (pmOdp || []).map((item, idx) => {
-            const oCode = odcMaster.find(o => o.id === item.odc_id)?.odc_code || 'N/A';
-            const pCode = odpMaster.find(o => o.id === item.odp_id)?.odp_code || 'N/A';
-            return { id: item.id, data: [idx+1, item.tanggal, oCode, pCode, item.sisa_port, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm] };
+        await buildReportSheet({
+            sheetName: 'ODP',
+            columnsSetup: {
+                widths:     [6, 12, 18, 18, 12, 10, 15, 24, 24, 24, 24, 24, 12],
+                alignments: ['center','center','center','center','center','center','center','center','center','center','center','center','center']
+            },
+            headers_r5: ['NO','TANGGAL','ODC','ODP','SISA PORT','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
+            headers_r6: ['','','','','','','','TUTUP','BUKA','TUTUP','BUKA','FOTO','REDAMAN'],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:I5','J5:K5','L5:M5'],
+            rowsData: (pmOdp || []).map((item, idx) => ({
+                id: item.id,
+                data: [idx+1, item.tanggal,
+                    odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A',
+                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
+                    item.sisa_port, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
+            })),
+            photoFields: [
+                { field: 'before_tutup', col: 8 },
+                { field: 'before_buka',  col: 9 },
+                { field: 'after_tutup',  col: 10 },
+                { field: 'after_buka',   col: 11 },
+                { field: 'foto_opm',     col: 12 }
+            ]
         });
-        const odp_photos = [
-            { field: 'photo_before_tutup', col: 8 }, { field: 'photo_before_buka', col: 9 },
-            { field: 'photo_after_tutup', col: 10 }, { field: 'photo_after_buka', col: 11 },
-            { field: 'photo_opm', col: 12 }
-        ];
-        await buildReportSheet({ sheetName: 'ODP', columnsSetup: { widths: odp_widths, alignments: odp_aligns }, headers_r5: odp_r5, headers_r6: odp_r6, mergeSpecs: odp_merges, rowsData: odp_rows, photoFields: odp_photos });
 
         // ── SHEET 3: CLOSURE ──────────────────────────────────────────────────────
-        const cls_widths = [6, 12, 18, 12, 15, 24, 24, 24];
-        const cls_aligns = ['center','center','center','center','left','center','center','center'];
-        const cls_r5 = ['NO','TANGGAL','KODE CLOSURE','KONDISI','KEGIATAN','FOTO CLOSURE','FOTO SPARE KABEL','FOTO KESELURUHAN'];
-        const cls_r6 = ['','','','','','','',''];
-        const cls_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6'];
-        const cls_rows = (pmClosure || []).map((item, idx) => {
-            const code = closureMaster.find(o => o.id === item.closure_id)?.closure_code || 'N/A';
-            return { id: item.id, data: [idx+1, item.tanggal, code, item.kondisi, item.kegiatan, '','',''] };
+        const closureCfg = {
+            widths:     [6, 12, 18, 12, 15, 24, 24, 24],
+            alignments: ['center','center','center','center','left','center','center','center']
+        };
+        await buildReportSheet({
+            sheetName: 'CLOSURE',
+            columnsSetup: closureCfg,
+            headers_r5: ['NO','TANGGAL','KODE CLOSURE','KONDISI','KEGIATAN','FOTO CLOSURE','FOTO SPARE KABEL','FOTO KESELURUHAN'],
+            headers_r6: ['','','','','','','',''],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6'],
+            rowsData: (pmClosure || []).map((item, idx) => ({
+                id: item.id,
+                data: [idx+1, item.tanggal, closureMaster?.find(o => o.id === item.closure_id)?.closure_code || 'N/A', item.kondisi, item.kegiatan, '','','']
+            })),
+            photoFields: [
+                { field: 'foto_closure', col: 6 }
+            ]
         });
-        const cls_photos = [{ field: 'photo_closure', col: 6 }, { field: 'photo_spare_kabel', col: 7 }, { field: 'photo_keseluruhan', col: 8 }];
-        await buildReportSheet({ sheetName: 'CLOSURE', columnsSetup: { widths: cls_widths, alignments: cls_aligns }, headers_r5: cls_r5, headers_r6: cls_r6, mergeSpecs: cls_merges, rowsData: cls_rows, photoFields: cls_photos });
 
         // ── SHEET 4: KABEL (SPAN) ─────────────────────────────────────────────────
-        const span_rows = (pmSpan || []).map((item, idx) => {
-            const code = spanMaster.find(o => o.id === item.span_id)?.span_code || 'N/A';
-            return { id: item.id, data: [idx+1, item.tanggal, code, item.kondisi, item.kegiatan, '','',''] };
+        await buildReportSheet({
+            sheetName: 'KABEL',
+            columnsSetup: closureCfg,
+            headers_r5: ['NO','TANGGAL','KODE SPAN','KONDISI','KEGIATAN','FOTO SPAN','FOTO SPARE KABEL','FOTO KESELURUHAN'],
+            headers_r6: ['','','','','','','',''],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6'],
+            rowsData: (pmSpan || []).map((item, idx) => ({
+                id: item.id,
+                data: [idx+1, item.tanggal, spanMaster?.find(o => o.id === item.span_id)?.span_code || 'N/A', item.kondisi, item.kegiatan, '','','']
+            })),
+            photoFields: [
+                { field: 'foto_span', col: 6 }
+            ]
         });
-        await buildReportSheet({ sheetName: 'KABEL', columnsSetup: { widths: cls_widths, alignments: cls_aligns }, headers_r5: cls_r5, headers_r6: cls_r6, mergeSpecs: cls_merges, rowsData: span_rows, photoFields: cls_photos });
 
         // ── SHEET 5: CUSTOMER (GANGGUAN) ──────────────────────────────────────────
-        const cst_widths = [6, 12, 18, 12, 15, 15, 8, 20, 15, 16, 16, 24, 24, 10, 10];
-        const cst_aligns = ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center'];
-        const cst_r5 = ['NO','DATE','NAMA','ID','ODC','ODP','PORT','ACTION','MATERIAL','SN ONT','','BEFORE','AFTER','JAM',''];
-        const cst_r6 = ['','','','','','','','','','NEW','OLD','','','MULAI','SELESAI'];
-        const cst_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:K5','L5:L6','M5:M6','N5:O5'];
-        const cst_rows = (corrective || []).map((item, idx) => {
-            const odcVal = odcMaster.find(o => o.id === item.odc_id)?.odc_code || 'tidak terinfo';
-            const odpVal = odpMaster.find(o => o.id === item.odp_id)?.odp_code || 'tidak terinfo';
-            return { id: item.id, data: [idx+1, item.tanggal, item.customer_name, item.service_id, odcVal, odpVal, item.port_no||'tidak terinfo', item.action, '-','-','-','','','14.00','14.50'] };
+        await buildReportSheet({
+            sheetName: 'CUSTOMER',
+            isCorrective: true,
+            columnsSetup: {
+                widths:     [6, 12, 18, 12, 15, 15, 8, 20, 15, 16, 16, 24, 24, 10, 10],
+                alignments: ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center']
+            },
+            headers_r5: ['NO','DATE','NAMA','ID','ODC','ODP','PORT','ACTION','MATERIAL','SN ONT','','BEFORE','AFTER','JAM',''],
+            headers_r6: ['','','','','','','','','','NEW','OLD','','','MULAI','SELESAI'],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:K5','L5:L6','M5:M6','N5:O5'],
+            rowsData: (corrective || []).map((item, idx) => ({
+                id: item.id,
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
+                    odcMaster?.find(o => o.id === item.odc_id)?.odc_code || '-',
+                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || '-',
+                    item.port_no || '-', item.action, item.material || '-',
+                    item.sn_ont_new || '-', item.sn_ont_old || '-',
+                    '','', item.jam_mulai || '-', item.jam_selesai || '-']
+            })),
+            photoFields: [
+                { field: 'foto_before', col: 12 },
+                { field: 'foto_after',  col: 13 }
+            ]
         });
-        const cst_photos = [{ field: 'photo_before', col: 12 }, { field: 'photo_after', col: 13 }];
-        await buildReportSheet({ sheetName: 'CUSTOMER', isCorrective: true, columnsSetup: { widths: cst_widths, alignments: cst_aligns }, headers_r5: cst_r5, headers_r6: cst_r6, mergeSpecs: cst_merges, rowsData: cst_rows, photoFields: cst_photos });
 
         // ── SHEET 6: DISMANTLING ──────────────────────────────────────────────────
-        const dsm_widths = [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24];
-        const dsm_aligns = ['center','center','left','center','center','center','center','center','left','center','center'];
-        const dsm_r5 = ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO SERIALNUMBER','FOTO RUMAH'];
-        const dsm_r6 = ['','','','','','','','','','',''];
-        const dsm_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6'];
-        const dsm_rows = (dismantling || []).map((item, idx) => {
-            const odpVal = odpMaster.find(o => o.id === item.odp_id)?.odp_code || 'N/A';
-            return {
+        await buildReportSheet({
+            sheetName: 'DISMANTLING',
+            columnsSetup: {
+                widths:     [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24],
+                alignments: ['center','center','left','center','center','center','center','center','left','center','center']
+            },
+            headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO SERIALNUMBER','FOTO RUMAH'],
+            headers_r6: ['','','','','','','','','','',''],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6'],
+            rowsData: (dismantling || []).map((item, idx) => ({
                 id: item.id,
-                data: [
-                    idx+1, item.tanggal, item.customer_name, item.service_id, odpVal, item.port_no||'-',
-                    item.action.replace('Pencabutan Dropcore ONT SN: ',''),
-                    item.catatan.split(', ')[0].replace('HP: ',''),
-                    item.catatan.split(', ')[1]?.replace('Alamat: ','')||'-',
-                    '','',
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
+                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
+                    item.port_no || '-', item.sn_ont || '-',
+                    item.no_hp || '-', item.alamat || '-',
+                    '',''
                 ]
-            };
+            })),
+            photoFields: [
+                { field: 'foto_sn_ont', col: 10 },
+                { field: 'foto_rumah',  col: 11 }
+            ]
         });
-        const dsm_photos = [{ field: 'photo_serialnumber', col: 10 }, { field: 'photo_rumah', col: 11 }];
-        await buildReportSheet({ sheetName: 'DISMANTLING', columnsSetup: { widths: dsm_widths, alignments: dsm_aligns }, headers_r5: dsm_r5, headers_r6: dsm_r6, mergeSpecs: dsm_merges, rowsData: dsm_rows, photoFields: dsm_photos });
 
-        // ── SHEET 7: AKTIVASI ─────────────────────────────────────────────────────
-        const psb_widths = [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24, 24, 24, 24, 24, 24];
-        const psb_aligns = ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center'];
-        const psb_r5 = ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO ODP','PORT ODP','REDAM ODP','REDAM ONT','FOTO SN','FOTO RUMAH','SPEEDTEST'];
-        const psb_r6 = ['','','','','','','','','','','','','','','',''];
-        const psb_merges = ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6','L5:L6','M5:M6','N5:N6','O5:O6','P5:P6'];
-        const psb_rows = (psb || []).map((item, idx) => {
-            const odpVal = odpMaster.find(o => o.id === item.odp_id)?.odp_code || 'N/A';
-            return {
+        // ── SHEET 7: AKTIVASI (PSB) ───────────────────────────────────────────────
+        await buildReportSheet({
+            sheetName: 'AKTIVASI',
+            columnsSetup: {
+                widths:     [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24, 24, 24, 24, 24, 24],
+                alignments: ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center']
+            },
+            headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO ODP','PORT ODP','REDAM ODP','REDAM ONT','FOTO SN','FOTO RUMAH','SPEEDTEST'],
+            headers_r6: ['','','','','','','','','','','','','','','',''],
+            mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6','L5:L6','M5:M6','N5:N6','O5:O6','P5:P6'],
+            rowsData: (psb || []).map((item, idx) => ({
                 id: item.id,
-                data: [
-                    idx+1, item.tanggal, item.customer_name, item.service_id, odpVal, item.port_no,
-                    item.sn_ont,
-                    item.action.replace('Aktivasi Baru No HP: ',''),
-                    item.alamat,
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
+                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
+                    item.port_no, item.sn_ont,
+                    item.no_hp || '-', item.alamat || '-',
                     '','','','','','',''
                 ]
-            };
+            })),
+            photoFields: [
+                { field: 'foto_odp',          col: 10 },
+                { field: 'foto_port_odp',      col: 11 },
+                { field: 'foto_redaman_odp',   col: 12 },
+                { field: 'foto_redaman_akhir', col: 13 },
+                { field: 'foto_sn_ont',        col: 14 },
+                { field: 'foto_instalasi',     col: 15 },
+                { field: 'foto_speedtest',     col: 16 }
+            ]
         });
-        const psb_photos = [
-            { field: 'photo_odp', col: 10 },           { field: 'photo_port_odp', col: 11 },
-            { field: 'photo_redaman_odp', col: 12 },    { field: 'photo_redaman_akhir', col: 13 },
-            { field: 'photo_serial_number_ont', col: 14 }, { field: 'photo_instalasi_rumah', col: 15 },
-            { field: 'photo_speedtest', col: 16 }
-        ];
-        await buildReportSheet({ sheetName: 'AKTIVASI', columnsSetup: { widths: psb_widths, alignments: psb_aligns }, headers_r5: psb_r5, headers_r6: psb_r6, mergeSpecs: psb_merges, rowsData: psb_rows, photoFields: psb_photos });
 
         // 6. Kirim file sebagai unduhan biner .xlsx ke browser admin
         const formattedFileName = `Laporan_Bulanan_${project.project_name.replace(/\s+/g, '_')}.xlsx`;
@@ -670,7 +708,7 @@ app.get('/api/report/export', async (req, res) => {
         res.end();
 
     } catch (err) {
-        console.error("Internal Server Error on Export:", err);
+        console.error('Internal Server Error on Export:', err);
         res.status(500).send(`<h1>Error saat mengekspor laporan:</h1><p>${err.message}</p>`);
     }
 });
