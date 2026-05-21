@@ -345,7 +345,8 @@ app.get('/api/report/export', async (req, res) => {
             let curRow = 7;
             for (const r of rowsData) {
                 const wsRow = ws.getRow(curRow);
-                wsRow.height = photoFields.length > 0 ? 110 : 22;
+                // Tinggi row: 75 untuk baris dengan foto (lebih rapat), 22 untuk baris teks saja
+                wsRow.height = photoFields.length > 0 ? 75 : 22;
 
                 r.data.forEach((val, colIdx) => {
                     const cell = wsRow.getCell(colIdx + 1);
