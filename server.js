@@ -23,13 +23,33 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
 });
 
 app.get('/', (req, res) => {
     res.status(200).send('🚀 Server Portal Pelaporan Famika Aktif & Terhubung ke Supabase!');
 });
+
+// ─── MODULE TABLE MAP ─────────────────────────────────────────────────────────
+const MODULE_TABLE_MAP = {
+    form_odc:        'pm_odc',
+    form_odp:        'pm_odp',
+    form_closure:    'pm_closure',
+    form_span:       'pm_span',
+    form_gangguan:   'corrective_customer',
+    form_dismantling:'dismantling_records',
+    form_psb:        'psb_records',
+    odc:             'pm_odc',
+    odp:             'pm_odp',
+    closure:         'pm_closure',
+    span:            'pm_span',
+    gangguan:        'corrective_customer',
+    dismantling:     'dismantling_records',
+    psb:             'psb_records',
+};
 
 // ─── HELPER: Download dari Storage lalu konversi ke JPEG via sharp ────────────
 async function downloadAsJpegBuffer(filePath) {
@@ -99,6 +119,180 @@ async function getSpanId(kodeSpan, siteId) {
 
 app.post('/api/report/odc', upload.any(), async (req, res) => {
     res.status(400).json({ success: false, message: 'Gunakan upload direct SDK yang ada di index.html' });
+});
+
+// ─── [NEW] GET LIST DATA PER MODUL ───────────────────────────────────────────
+// GET /api/data/:module?project_id=xxx
+app.get('/api/data/:module', async (req, res) => {
+    try {
+        const { module } = req.params;
+        const { project_id } = req.query;
+        const tableName = MODULE_TABLE_MAP[module];
+        if (!tableName) return res.status(400).json({ success: false, message: `Modul "${module}" tidak dikenali.` });
+        if (!project_id) return res.status(400).json({ success: false, message: 'project_id wajib diisi.' });
+
+        const { data, error } = await supabase
+            .from(tableName)
+            .select('*')
+            .eq('period_id', project_id)
+            .order('created_at', { ascending: false });
+
+        if (error) throw new Error(error.message);
+
+        // Ambil foto untuk semua record
+        const ids = (data || []).map(r => r.id);
+        let photoMap = {};
+        if (ids.length > 0) {
+            const { data: photos } = await supabase
+                .from('photo_assets')
+                .select('record_id, photo_kind, file_path, file_name')
+                .in('record_id', ids);
+            (photos || []).forEach(p => {
+                if (!photoMap[p.record_id]) photoMap[p.record_id] = [];
+                photoMap[p.record_id].push(p);
+            });
+        }
+
+        // Ambil master data untuk lookup nama ODC/ODP/Closure/Span
+        const [{ data: odcMaster }, { data: odpMaster }, { data: closureMaster }, { data: spanMaster }] = await Promise.all([
+            supabase.from('odc_master').select('id, odc_code'),
+            supabase.from('odp_master').select('id, odp_code'),
+            supabase.from('closure_master').select('id, closure_code'),
+            supabase.from('span_master').select('id, span_code'),
+        ]);
+
+        const enriched = (data || []).map(row => ({
+            ...row,
+            odc_code:     odcMaster?.find(o => o.id === row.odc_id)?.odc_code     || null,
+            odp_code:     odpMaster?.find(o => o.id === row.odp_id)?.odp_code     || null,
+            closure_code: closureMaster?.find(o => o.id === row.closure_id)?.closure_code || null,
+            span_code:    spanMaster?.find(o => o.id === row.span_id)?.span_code   || null,
+            photos:       photoMap[row.id] || [],
+        }));
+
+        res.json({ success: true, data: enriched });
+    } catch (err) {
+        console.error('[GET LIST]', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── [NEW] GET DETAIL SINGLE RECORD ──────────────────────────────────────────
+// GET /api/data/:module/:id
+app.get('/api/data/:module/:id', async (req, res) => {
+    try {
+        const { module, id } = req.params;
+        const tableName = MODULE_TABLE_MAP[module];
+        if (!tableName) return res.status(400).json({ success: false, message: `Modul "${module}" tidak dikenali.` });
+
+        const { data, error } = await supabase.from(tableName).select('*').eq('id', id).single();
+        if (error || !data) return res.status(404).json({ success: false, message: 'Record tidak ditemukan.' });
+
+        const { data: photos } = await supabase
+            .from('photo_assets')
+            .select('id, photo_kind, file_path, file_name')
+            .eq('record_id', id);
+
+        // Buat signed URL untuk setiap foto agar bisa ditampilkan di preview
+        const photosWithUrl = await Promise.all((photos || []).map(async p => {
+            const { data: signed } = await supabase.storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(p.file_path, 3600);
+            return { ...p, signed_url: signed?.signedUrl || null };
+        }));
+
+        res.json({ success: true, data: { ...data, photos: photosWithUrl } });
+    } catch (err) {
+        console.error('[GET DETAIL]', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── [NEW] PUT UPDATE RECORD ──────────────────────────────────────────────────
+// PUT /api/data/:module/:id
+// Body: { fields: {...}, deletedPhotoIds: [...], newPhotos: [{photo_kind, file_path, file_name, file_size, uploaded_by}] }
+app.put('/api/data/:module/:id', async (req, res) => {
+    try {
+        const { module, id } = req.params;
+        const tableName = MODULE_TABLE_MAP[module];
+        if (!tableName) return res.status(400).json({ success: false, message: `Modul "${module}" tidak dikenali.` });
+
+        const { fields = {}, deletedPhotoIds = [], newPhotos = [] } = req.body;
+
+        // Update field utama
+        const { error: updateErr } = await supabase.from(tableName).update(fields).eq('id', id);
+        if (updateErr) throw new Error(updateErr.message);
+
+        // Hapus foto lama yang ditandai dihapus
+        if (deletedPhotoIds.length > 0) {
+            const { data: toDelete } = await supabase
+                .from('photo_assets')
+                .select('file_path')
+                .in('id', deletedPhotoIds);
+
+            // Hapus dari storage
+            const filePaths = (toDelete || []).map(p => p.file_path);
+            if (filePaths.length > 0) {
+                await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
+            }
+            // Hapus dari tabel photo_assets
+            await supabase.from('photo_assets').delete().in('id', deletedPhotoIds);
+        }
+
+        // Insert foto baru (sudah diupload dari client ke storage)
+        if (newPhotos.length > 0) {
+            const insertData = newPhotos.map(p => ({
+                module_name: module,
+                record_id:   id,
+                photo_kind:  p.photo_kind,
+                file_path:   p.file_path,
+                file_name:   p.file_name,
+                mime_type:   'image/jpeg',
+                file_size:   p.file_size || 0,
+                uploaded_by: p.uploaded_by || null,
+            }));
+            await supabase.from('photo_assets').insert(insertData);
+        }
+
+        res.json({ success: true, message: 'Data berhasil diperbarui.' });
+    } catch (err) {
+        console.error('[PUT UPDATE]', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── [NEW] DELETE RECORD ──────────────────────────────────────────────────────
+// DELETE /api/data/:module/:id
+app.delete('/api/data/:module/:id', async (req, res) => {
+    try {
+        const { module, id } = req.params;
+        const tableName = MODULE_TABLE_MAP[module];
+        if (!tableName) return res.status(400).json({ success: false, message: `Modul "${module}" tidak dikenali.` });
+
+        // Ambil semua foto terkait
+        const { data: photos } = await supabase
+            .from('photo_assets')
+            .select('file_path')
+            .eq('record_id', id);
+
+        // Hapus dari storage
+        const filePaths = (photos || []).map(p => p.file_path);
+        if (filePaths.length > 0) {
+            await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
+        }
+
+        // Hapus dari photo_assets
+        await supabase.from('photo_assets').delete().eq('record_id', id);
+
+        // Hapus record utama
+        const { error: delErr } = await supabase.from(tableName).delete().eq('id', id);
+        if (delErr) throw new Error(delErr.message);
+
+        res.json({ success: true, message: 'Data berhasil dihapus.' });
+    } catch (err) {
+        console.error('[DELETE]', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
 });
 
 // ─── ENDPOINT PREVIEW FOTO ─────────────────────────────────────────────────────
@@ -273,8 +467,6 @@ app.get('/api/report/export', async (req, res) => {
             }
         }
 
-        // photoRowHeight: tinggi row untuk baris berisi foto (diambil presisi dari file contoh)
-        // ODC/ODP/CLOSURE/KABEL/DISMANTLING/AKTIVASI = 189, CUSTOMER = 100
         async function buildReportSheet({ sheetName, isCorrective = false, columnsSetup, headers_r5, headers_r6, mergeSpecs, rowsData, photoFields, photoRowHeight = 189 }) {
             const ws = workbook.addWorksheet(sheetName);
             ws.views = [{ showGridLines: true }];
@@ -308,7 +500,6 @@ app.get('/api/report/export', async (req, res) => {
             });
             mergeSpecs.forEach(m => { ws.mergeCells(m); });
 
-            // ── Download & konversi semua foto secara paralel via sharp ────────
             const downloadPromises = [];
             rowsData.forEach(r => {
                 const assets = photoMap[r.id] || [];
@@ -335,11 +526,9 @@ app.get('/api/report/export', async (req, res) => {
                 if (asset) activePhotoMap[`${asset.recordId}_${asset.field}`] = asset;
             });
 
-            // ── Tulis data row by row ──────────────────────────────────────────
             let curRow = 7;
             for (const r of rowsData) {
                 const wsRow = ws.getRow(curRow);
-                // Gunakan photoRowHeight yang presisi sesuai file contoh per sheet
                 wsRow.height = photoFields.length > 0 ? photoRowHeight : 22;
 
                 r.data.forEach((val, colIdx) => {
@@ -382,7 +571,6 @@ app.get('/api/report/export', async (req, res) => {
             applyBordersToRange(ws, 1, 5, columnsSetup.widths.length, curRow - 1);
         }
 
-        // ── SHEET 1: ODC (photoRowHeight=189) ────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODC',
             photoRowHeight: 189,
@@ -403,7 +591,6 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 2: ODP (photoRowHeight=189) ────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODP',
             photoRowHeight: 189,
@@ -424,7 +611,6 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 3: CLOSURE (photoRowHeight=189) ────────────────────────────
         const closureCfg = { widths: [11.5,10,18.83,12,19.5,25.58,25.58,25.58], alignments: ['center','center','center','center','left','center','center','center'] };
         await buildReportSheet({
             sheetName: 'CLOSURE',
@@ -440,7 +626,6 @@ app.get('/api/report/export', async (req, res) => {
             photoFields: [{ field: 'foto_closure', col: 6 }]
         });
 
-        // ── SHEET 4: KABEL (photoRowHeight=189) ──────────────────────────────
         await buildReportSheet({
             sheetName: 'KABEL',
             photoRowHeight: 189,
@@ -455,7 +640,6 @@ app.get('/api/report/export', async (req, res) => {
             photoFields: [{ field: 'foto_span', col: 6 }]
         });
 
-        // ── SHEET 5: CUSTOMER (photoRowHeight=100 sesuai file contoh) ────────
         await buildReportSheet({
             sheetName: 'CUSTOMER',
             isCorrective: true,
@@ -474,7 +658,6 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 6: DISMANTLING (photoRowHeight=189) ────────────────────────
         await buildReportSheet({
             sheetName: 'DISMANTLING',
             photoRowHeight: 189,
@@ -492,7 +675,6 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 7: AKTIVASI (photoRowHeight=189) ───────────────────────────
         await buildReportSheet({
             sheetName: 'AKTIVASI',
             photoRowHeight: 189,
