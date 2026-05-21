@@ -159,7 +159,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
         </div>
         <h4 class="text-lg font-black text-slate-900">Laporan Terkirim!</h4>
-        <p class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data & foto berhasil tersimpan ke database Supabase.</p>
+        <p id="success-detail-text" class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data & foto berhasil tersimpan ke database.</p>
         <button onclick="afterSuccessRedirect()" class="mt-5 w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Kembali ke Menu</button>
     </div>
 </div>
@@ -457,9 +457,11 @@ function handlePhotoSelect(event, index) {
 // ============================================================
 // SUBMIT
 // Alur:
-//   1. Insert data utama ke tabel → dapat record_id
-//   2. Upload tiap foto ke Storage
-//   3. Insert satu baris ke photo_assets per foto
+//   1. Resolve technician_id dari tabel users
+//   2. Insert data utama → dapat record_id
+//   3. Upload tiap foto ke Storage (non-blocking per foto)
+//   4. Batch insert metadata ke photo_assets
+//   5. Tampilkan sukses dengan info jumlah foto yang berhasil
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
@@ -471,7 +473,17 @@ async function handleSubmit(event) {
     document.getElementById('submit-btn').disabled = true;
 
     try {
-        // --- LANGKAH 1: Kumpulkan data form (tanpa foto) ---
+        // --- LANGKAH 1: Resolve technician_id ---
+        if (!technicianUserId) {
+            try {
+                const uData = await sb(`users?full_name=ilike.${encodeURIComponent('%'+technicianUsername+'%')}&select=id&limit=1`);
+                if (uData?.[0]?.id) technicianUserId = uData[0].id;
+            } catch (e) {
+                console.warn('Tidak bisa resolve technician_id:', e.message);
+            }
+        }
+
+        // --- LANGKAH 2: Kumpulkan data form (tanpa foto) ---
         const formData = { period_id: activeProjectId, site_id: activeSiteId };
         document.getElementById('dynamic-form-fields').querySelectorAll('input,select,textarea').forEach(el => {
             if (!el.id) return;
@@ -481,72 +493,84 @@ async function handleSubmit(event) {
             else val = el.value || null;
             formData[el.id] = val;
         });
+        if (technicianUserId) formData.technician_id = technicianUserId;
 
-        // Isi technician_id berdasarkan username
-        if (technicianUserId) {
-            formData.technician_id = technicianUserId;
-        } else {
-            const uData = await sb(`users?full_name=ilike.${encodeURIComponent('%'+technicianUsername+'%')}&select=id&limit=1`);
-            if (uData?.[0]?.id) { technicianUserId = uData[0].id; formData.technician_id = technicianUserId; }
-        }
-
-        // --- LANGKAH 2: Insert data utama → dapat record_id ---
+        // --- LANGKAH 3: Insert data utama → dapat record_id ---
         document.getElementById('btn-text').innerText = 'Menyimpan laporan...';
         const inserted = await sbPost(def.table, formData);
         const recordId = inserted?.[0]?.id;
         if (!recordId) throw new Error('Gagal mendapatkan ID record yang disimpan.');
 
-        // --- LANGKAH 3: Upload foto & insert ke photo_assets ---
+        // --- LANGKAH 4: Upload foto ke Storage (non-blocking per foto) ---
         const photoKinds    = def.photoKinds || [];
         const uploadEntries = Object.entries(compressedBlobs);
-        if (uploadEntries.length > 0) {
-            document.getElementById('btn-text').innerText = `Mengupload foto (0/${uploadEntries.length})...`;
-        }
+        let   uploadedCount = 0;
+        const photoAssets   = [];
 
-        const photoAssets = [];
         for (let i = 0; i < uploadEntries.length; i++) {
             const [idxStr, blob] = uploadEntries[i];
             const idx       = parseInt(idxStr);
             const photoKind = photoKinds[idx] || `foto_${idx + 1}`;
-            const filename  = `${currentActiveTask}/${activeProjectId}/${recordId}_${photoKind}_${Date.now()}.jpg`;
+            const ts        = Date.now();
+            const filename  = `${currentActiveTask}/${activeProjectId}/${recordId}_${photoKind}_${ts}.jpg`;
 
             document.getElementById('btn-text').innerText = `Mengupload foto (${i+1}/${uploadEntries.length})...`;
 
-            const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filename}`, {
-                method: 'POST',
-                headers: {
-                    'apikey'       : SUPABASE_ANON_KEY,
-                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                    'Content-Type' : 'image/jpeg',
-                    'x-upsert'     : 'true'
-                },
-                body: blob
-            });
+            try {
+                const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filename}`, {
+                    method: 'POST',
+                    headers: {
+                        'apikey'       : SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'Content-Type' : 'image/jpeg',
+                        'x-upsert'     : 'true'
+                    },
+                    body: blob
+                });
 
-            if (!uploadRes.ok) {
-                console.warn(`Upload foto ${photoKind} gagal, lanjut...`);
-                continue;
+                if (!uploadRes.ok) {
+                    const errBody = await uploadRes.text();
+                    console.warn(`Upload foto ${photoKind} gagal (${uploadRes.status}): ${errBody}`);
+                    continue; // lanjut foto berikutnya, jangan throw
+                }
+
+                uploadedCount++;
+                photoAssets.push({
+                    module_name : currentActiveTask,
+                    record_id   : recordId,
+                    photo_kind  : photoKind,
+                    file_path   : filename,
+                    file_name   : `${photoKind}_${ts}.jpg`,
+                    mime_type   : 'image/jpeg',
+                    file_size   : blob.size,
+                    uploaded_by : technicianUserId || null
+                });
+            } catch (uploadErr) {
+                console.warn(`Error upload foto ${photoKind}:`, uploadErr.message);
+                // Tetap lanjut, jangan batalkan seluruh submit
             }
-
-            const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${filename}`;
-            photoAssets.push({
-                module_name : currentActiveTask,
-                record_id   : recordId,
-                photo_kind  : photoKind,
-                file_path   : filename,
-                file_name   : `${photoKind}_${Date.now()}.jpg`,
-                mime_type   : 'image/jpeg',
-                file_size   : blob.size,
-                uploaded_by : technicianUserId || null
-            });
         }
 
-        // Batch insert ke photo_assets
+        // --- LANGKAH 5: Batch insert metadata foto ke photo_assets ---
         if (photoAssets.length > 0) {
             document.getElementById('btn-text').innerText = 'Menyimpan metadata foto...';
-            await sbPost('photo_assets', photoAssets);
+            try {
+                await sbPost('photo_assets', photoAssets);
+            } catch (photoErr) {
+                // Insert foto gagal tidak membatalkan data utama yang sudah masuk
+                console.error('Gagal insert photo_assets:', photoErr.message);
+            }
         }
 
+        // Tampilkan pesan sukses dengan detail foto
+        const totalFoto = uploadEntries.length;
+        const infoFoto = totalFoto === 0
+            ? 'Data berhasil tersimpan (tanpa foto).'
+            : uploadedCount === totalFoto
+                ? `Data & ${uploadedCount} foto berhasil tersimpan.`
+                : `Data tersimpan. Foto: ${uploadedCount}/${totalFoto} berhasil diupload.`;
+
+        document.getElementById('success-detail-text').innerText = infoFoto;
         document.getElementById('success-modal').classList.remove('hidden');
 
     } catch (err) {
@@ -592,7 +616,7 @@ async function sbPost(table, body) {
         body: JSON.stringify(body)
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Gagal insert data.');
+    if (!res.ok) throw new Error(data.message || JSON.stringify(data));
     return data;
 }
 
@@ -701,29 +725,19 @@ function clearActiveProject() {
 // ============================================================
 // DROPDOWN LOADERS
 // ============================================================
-
-/**
- * syncAndRenderOdcDropdown:
- * Load semua ODC aktif di site ini, lalu FILTER yang sudah
- * diinput di pm_odc untuk project aktif → tidak ditampilkan.
- * Hanya berlaku di form_odc. Form lain (gangguan, dismantling,
- * psb) tidak perlu filter karena ODC boleh berulang di sana.
- */
 async function syncAndRenderOdcDropdown() {
     const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
     odcSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODC...</option>';
     try {
-        // Ambil semua ODC aktif di site ini
         const allOdc = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
 
-        // Jika form ODC: filter yang sudah diinput di project ini
         let usedOdcIds = new Set();
         if (currentActiveTask === 'form_odc' && activeProjectId) {
             try {
                 const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`);
                 used.forEach(r => usedOdcIds.add(r.odc_id));
-            } catch { /* abaikan error filter, tampilkan semua */ }
+            } catch { /* abaikan, tampilkan semua */ }
         }
 
         const isRequired = odcSelect.hasAttribute('required');
@@ -731,7 +745,6 @@ async function syncAndRenderOdcDropdown() {
             ? '<option value="" disabled selected>Pilih Kode ODC</option>'
             : '<option value="">— Tidak dipilih —</option>';
 
-        // Filter: hapus ODC yang sudah diinput
         const available = allOdc.filter(o => !usedOdcIds.has(o.id));
 
         if (currentActiveTask === 'form_odc' && available.length === 0) {
@@ -744,12 +757,6 @@ async function syncAndRenderOdcDropdown() {
     }
 }
 
-/**
- * fetchOdpsForSelectedOdc:
- * Load ODP berdasarkan ODC yang dipilih, lalu FILTER yang
- * sudah diinput di pm_odp untuk project aktif → tidak ditampilkan.
- * Hanya berlaku di form_odp. Form lain tidak difilter.
- */
 async function fetchOdpsForSelectedOdc() {
     const odcSelect = document.getElementById('odc_id');
     const odpSelect = document.getElementById('odp_id');
@@ -757,16 +764,14 @@ async function fetchOdpsForSelectedOdc() {
     odpSelect.disabled = false;
     odpSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODP...</option>';
     try {
-        // Ambil semua ODP aktif di bawah ODC ini
         const allOdp = await sb(`odp_master?odc_id=eq.${odcSelect.value}&is_active=eq.true&select=id,odp_code,total_port&order=odp_code`);
 
-        // Jika form ODP: filter yang sudah diinput di project ini
         let usedOdpIds = new Set();
         if (currentActiveTask === 'form_odp' && activeProjectId) {
             try {
                 const used = await sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`);
                 used.forEach(r => usedOdpIds.add(r.odp_id));
-            } catch { /* abaikan error filter, tampilkan semua */ }
+            } catch { /* abaikan */ }
         }
 
         const isRequired = odpSelect.hasAttribute('required');
@@ -774,7 +779,6 @@ async function fetchOdpsForSelectedOdc() {
             ? '<option value="" disabled selected>Pilih Kode ODP</option>'
             : '<option value="">— Tidak dipilih —</option>';
 
-        // Filter: hapus ODP yang sudah diinput
         const available = allOdp.filter(o => !usedOdpIds.has(o.id));
 
         if (currentActiveTask === 'form_odp' && available.length === 0) {
