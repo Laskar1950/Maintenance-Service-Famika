@@ -246,9 +246,11 @@ const FORM_DEFINITIONS = {
         // photo_kind values sesuai urutan slot foto
         photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
         photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
+        // FIX BUG #1: hapus onchange dari odc_id di form_odc
+        // syncAndRenderOdcDropdown() sudah dipanggil otomatis di showView(), tidak perlu di onchange
         fields: () => fCard(
             fSectionTitle('Data PM ODC'),
-            fDynSelect('odc_id','Kode ODC','Memuat daftar ODC...',true,'syncAndRenderOdcDropdown()'),
+            fDynSelect('odc_id','Kode ODC','Pilih Kode ODC',true),
             fSelect('kondisi','Kondisi',[{v:'BAIK',l:'Baik'},{v:'KURANG BAIK',l:'Kurang Baik'}],true),
             fSelect('kegiatan','Kegiatan',[{v:'PERAPIHAN',l:'Perapihan'},{v:'PERBAIKAN',l:'Perbaikan'}],true),
             fInput('hasil_opm','Hasil OPM (dBm)','Contoh: -18.97',true,'number')
@@ -457,11 +459,27 @@ function handlePhotoSelect(event, index) {
 }
 
 // ============================================================
+// FIX BUG #2: Cek duplikat data sebelum insert
+// Untuk pm_odc: cek kombinasi period_id + odc_id
+// Untuk pm_odp: cek kombinasi period_id + odp_id
+// ============================================================
+async function checkDuplicate(table, periodId, fieldName, fieldValue) {
+    if (!fieldValue) return false;
+    try {
+        const data = await sb(`${table}?period_id=eq.${periodId}&${fieldName}=eq.${fieldValue}&select=id&limit=1`);
+        return data && data.length > 0;
+    } catch {
+        return false;
+    }
+}
+
+// ============================================================
 // SUBMIT — OPSI A: PHOTO_ASSETS TERPUSAT
 // Alur:
-//   1. Insert data utama ke tabel (pm_odc, pm_odp, dst.) → dapat record_id
-//   2. Upload tiap foto ke Storage (laporan-foto bucket)
-//   3. Insert satu baris ke photo_assets per foto
+//   1. Cek duplikat (untuk pm_odc & pm_odp)
+//   2. Insert data utama ke tabel (pm_odc, pm_odp, dst.) → dapat record_id
+//   3. Upload tiap foto ke Storage (laporan-foto bucket)
+//   4. Insert satu baris ke photo_assets per foto
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
@@ -483,6 +501,30 @@ async function handleSubmit(event) {
             else val = el.value || null;
             formData[el.id] = val;
         });
+
+        // --- FIX BUG #2: Validasi duplikat untuk pm_odc dan pm_odp ---
+        if (currentActiveTask === 'form_odc') {
+            const odcId = formData['odc_id'];
+            if (!odcId) { throw new Error('Pilih Kode ODC terlebih dahulu.'); }
+            const isDuplicate = await checkDuplicate('pm_odc', activeProjectId, 'odc_id', odcId);
+            if (isDuplicate) {
+                // Ambil label ODC untuk pesan error yang informatif
+                const odcEl = document.getElementById('odc_id');
+                const odcLabel = odcEl?.options[odcEl.selectedIndex]?.text || odcId;
+                throw new Error(`Data PM ODC untuk "${odcLabel}" sudah pernah diinput pada project ini. Setiap ODC hanya boleh diinput 1x per project.`);
+            }
+        }
+
+        if (currentActiveTask === 'form_odp') {
+            const odpId = formData['odp_id'];
+            if (!odpId) { throw new Error('Pilih Kode ODP terlebih dahulu.'); }
+            const isDuplicate = await checkDuplicate('pm_odp', activeProjectId, 'odp_id', odpId);
+            if (isDuplicate) {
+                const odpEl = document.getElementById('odp_id');
+                const odpLabel = odpEl?.options[odpEl.selectedIndex]?.text || odpId;
+                throw new Error(`Data PM ODP untuk "${odpLabel}" sudah pernah diinput pada project ini. Setiap ODP hanya boleh diinput 1x per project.`);
+            }
+        }
 
         // Isi technician_id berdasarkan username
         if (technicianUserId) {
