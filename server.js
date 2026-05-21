@@ -32,7 +32,6 @@ app.get('/', (req, res) => {
 });
 
 // ─── HELPER: Download dari Storage lalu konversi ke JPEG via sharp ────────────
-// Ini memastikan semua format (HEIC, WebP, PNG, dll) bisa masuk ke ExcelJS
 async function downloadAsJpegBuffer(filePath) {
     const { data, error } = await supabase.storage
         .from(STORAGE_BUCKET)
@@ -46,9 +45,8 @@ async function downloadAsJpegBuffer(filePath) {
     try {
         const ab  = await data.arrayBuffer();
         const raw = Buffer.from(ab);
-        // Konversi ke JPEG via sharp: menangani semua format kamera HP (HEIC, WebP, PNG, dll)
         const jpegBuf = await sharp(raw)
-            .rotate()           // auto-rotate berdasarkan EXIF orientation
+            .rotate()
             .resize({ width: 800, withoutEnlargement: true })
             .jpeg({ quality: 80 })
             .toBuffer();
@@ -103,10 +101,7 @@ app.post('/api/report/odc', upload.any(), async (req, res) => {
     res.status(400).json({ success: false, message: 'Gunakan upload direct SDK yang ada di index.html' });
 });
 
-// ─── ENDPOINT PREVIEW FOTO (BARU) ─────────────────────────────────────────────
-// GET /api/report/preview?project_id=xxx
-// Mengembalikan halaman HTML berisi semua foto dari project tersebut
-// sehingga admin bisa verifikasi foto sebelum download Excel
+// ─── ENDPOINT PREVIEW FOTO ─────────────────────────────────────────────────────
 app.get('/api/report/preview', async (req, res) => {
     try {
         const { project_id } = req.query;
@@ -118,7 +113,6 @@ app.get('/api/report/preview', async (req, res) => {
         const namaBulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
         const periodeStr = `${namaBulan[project.bulan - 1]} ${project.tahun}`;
 
-        // Ambil semua record ID milik project
         const tables = [
             { name: 'pm_odc',              label: 'ODC' },
             { name: 'pm_odp',              label: 'ODP' },
@@ -149,7 +143,6 @@ app.get('/api/report/preview', async (req, res) => {
             return res.send(`<html><body style="font-family:Arial;padding:20px"><h2>Preview Foto — ${project.project_name}</h2><p>Belum ada foto tersimpan untuk project ini.</p></body></html>`);
         }
 
-        // Generate signed URL (valid 60 menit) untuk setiap foto
         const photoRows = [];
         for (const p of photos) {
             const { data: signedData, error: signErr } = await supabase.storage
@@ -164,7 +157,6 @@ app.get('/api/report/preview', async (req, res) => {
             });
         }
 
-        // Render HTML preview
         const cards = photoRows.map(p => `
             <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;break-inside:avoid">
                 <p style="margin:0 0 4px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em">${p.module} &mdash; ${p.photo_kind}</p>
@@ -281,20 +273,22 @@ app.get('/api/report/export', async (req, res) => {
             }
         }
 
-        async function buildReportSheet({ sheetName, isCorrective = false, columnsSetup, headers_r5, headers_r6, mergeSpecs, rowsData, photoFields }) {
+        // photoRowHeight: tinggi row untuk baris berisi foto (diambil presisi dari file contoh)
+        // ODC/ODP/CLOSURE/KABEL/DISMANTLING/AKTIVASI = 189, CUSTOMER = 100
+        async function buildReportSheet({ sheetName, isCorrective = false, columnsSetup, headers_r5, headers_r6, mergeSpecs, rowsData, photoFields, photoRowHeight = 189 }) {
             const ws = workbook.addWorksheet(sheetName);
             ws.views = [{ showGridLines: true }];
 
             ws.getCell('A1').value = isCorrective ? 'Corrective Manage Service' : 'Preventive Manage service';
             ws.getCell('A1').font = { name: 'Arial', size: 14, bold: true };
-            ws.getRow(1).height = 24;
+            ws.getRow(1).height = 23.5;
             ws.getCell('A2').value = `Stasiun : ${project.site_code.split(' - ')[1] || project.site_code}`;
             ws.getCell('A2').font = { name: 'Arial', size: 11, bold: true };
-            ws.getRow(2).height = 18;
+            ws.getRow(2).height = 23.5;
             ws.getCell('A3').value = `Periode : ${stringBulanText}`;
             ws.getCell('A3').font = { name: 'Arial', size: 11, bold: true };
-            ws.getRow(3).height = 18;
-            ws.getRow(4).height = 12;
+            ws.getRow(3).height = 23.5;
+            ws.getRow(4).height = 16;
 
             columnsSetup.widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
 
@@ -306,7 +300,7 @@ app.get('/api/report/export', async (req, res) => {
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
             const r6 = ws.getRow(6);
-            r6.height = 20;
+            r6.height = 16;
             headers_r6.forEach((val, i) => {
                 const cell = r6.getCell(i + 1);
                 cell.value = val; cell.font = boldFont; cell.fill = tableHeaderFill;
@@ -345,8 +339,8 @@ app.get('/api/report/export', async (req, res) => {
             let curRow = 7;
             for (const r of rowsData) {
                 const wsRow = ws.getRow(curRow);
-                // Tinggi row: 75 untuk baris dengan foto (lebih rapat), 22 untuk baris teks saja
-                wsRow.height = photoFields.length > 0 ? 75 : 22;
+                // Gunakan photoRowHeight yang presisi sesuai file contoh per sheet
+                wsRow.height = photoFields.length > 0 ? photoRowHeight : 22;
 
                 r.data.forEach((val, colIdx) => {
                     const cell = wsRow.getCell(colIdx + 1);
@@ -361,7 +355,6 @@ app.get('/api/report/export', async (req, res) => {
 
                     if (asset && asset.buffer) {
                         try {
-                            // Buffer sudah pasti JPEG hasil konversi sharp
                             const imgId = workbook.addImage({ buffer: asset.buffer, extension: 'jpeg' });
                             ws.addImage(imgId, {
                                 tl: { col: pf.col - 1, row: curRow - 1 },
@@ -389,10 +382,11 @@ app.get('/api/report/export', async (req, res) => {
             applyBordersToRange(ws, 1, 5, columnsSetup.widths.length, curRow - 1);
         }
 
-        // ── SHEET 1: ODC ──────────────────────────────────────────────────────
+        // ── SHEET 1: ODC (photoRowHeight=189) ────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODC',
-            columnsSetup: { widths: [6,12,18,10,15,24,24,24,24,24,12], alignments: ['center','center','center','center','center','center','center','center','center','center','center'] },
+            photoRowHeight: 189,
+            columnsSetup: { widths: [11.5,10,18.83,15.5,19.5,25.58,25.58,25.58,25.58,25.58,9.5], alignments: ['center','center','center','center','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','ODC','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','BUKA','TUTUP','BUKA','TUTUP','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:G5','H5:I5','J5:K5'],
@@ -409,10 +403,11 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 2: ODP ──────────────────────────────────────────────────────
+        // ── SHEET 2: ODP (photoRowHeight=189) ────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODP',
-            columnsSetup: { widths: [6,12,18,18,12,10,15,24,24,24,24,24,12], alignments: ['center','center','center','center','center','center','center','center','center','center','center','center','center'] },
+            photoRowHeight: 189,
+            columnsSetup: { widths: [11.33,14,11.5,24.58,24.58,12.75,19.5,25.58,25.58,25.58,25.58,25.58,9.91], alignments: ['center','center','center','center','center','center','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','ODC','ODP','SISA PORT','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','','','TUTUP','BUKA','TUTUP','BUKA','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:I5','J5:K5','L5:M5'],
@@ -429,10 +424,11 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 3: CLOSURE ──────────────────────────────────────────────────
-        const closureCfg = { widths: [6,12,18,12,15,24,24,24], alignments: ['center','center','center','center','left','center','center','center'] };
+        // ── SHEET 3: CLOSURE (photoRowHeight=189) ────────────────────────────
+        const closureCfg = { widths: [11.5,10,18.83,12,19.5,25.58,25.58,25.58], alignments: ['center','center','center','center','left','center','center','center'] };
         await buildReportSheet({
             sheetName: 'CLOSURE',
+            photoRowHeight: 189,
             columnsSetup: closureCfg,
             headers_r5: ['NO','TANGGAL','KODE CLOSURE','KONDISI','KEGIATAN','FOTO CLOSURE','FOTO SPARE KABEL','FOTO KESELURUHAN'],
             headers_r6: ['','','','','','','',''],
@@ -444,9 +440,10 @@ app.get('/api/report/export', async (req, res) => {
             photoFields: [{ field: 'foto_closure', col: 6 }]
         });
 
-        // ── SHEET 4: KABEL (SPAN) ─────────────────────────────────────────────
+        // ── SHEET 4: KABEL (photoRowHeight=189) ──────────────────────────────
         await buildReportSheet({
             sheetName: 'KABEL',
+            photoRowHeight: 189,
             columnsSetup: closureCfg,
             headers_r5: ['NO','TANGGAL','KODE SPAN','KONDISI','KEGIATAN','FOTO SPAN','FOTO SPARE KABEL','FOTO KESELURUHAN'],
             headers_r6: ['','','','','','','',''],
@@ -458,11 +455,12 @@ app.get('/api/report/export', async (req, res) => {
             photoFields: [{ field: 'foto_span', col: 6 }]
         });
 
-        // ── SHEET 5: CUSTOMER (GANGGUAN) ──────────────────────────────────────
+        // ── SHEET 5: CUSTOMER (photoRowHeight=100 sesuai file contoh) ────────
         await buildReportSheet({
             sheetName: 'CUSTOMER',
             isCorrective: true,
-            columnsSetup: { widths: [6,12,18,12,15,15,8,20,15,16,16,24,24,10,10], alignments: ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center'] },
+            photoRowHeight: 100,
+            columnsSetup: { widths: [6,12,18,12,15,15,8,20,15,16,16,25.58,25.58,10,10], alignments: ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','DATE','NAMA','ID','ODC','ODP','PORT','ACTION','MATERIAL','SN ONT','','BEFORE','AFTER','JAM',''],
             headers_r6: ['','','','','','','','','','NEW','OLD','','','MULAI','SELESAI'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:K5','L5:L6','M5:M6','N5:O5'],
@@ -476,10 +474,11 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 6: DISMANTLING ──────────────────────────────────────────────
+        // ── SHEET 6: DISMANTLING (photoRowHeight=189) ────────────────────────
         await buildReportSheet({
             sheetName: 'DISMANTLING',
-            columnsSetup: { widths: [6,12,18,12,12,8,16,15,20,24,24], alignments: ['center','center','left','center','center','center','center','center','left','center','center'] },
+            photoRowHeight: 189,
+            columnsSetup: { widths: [11.5,10,18,12,12,8,16,15,20,25.58,25.58], alignments: ['center','center','left','center','center','center','center','center','left','center','center'] },
             headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO SERIALNUMBER','FOTO RUMAH'],
             headers_r6: ['','','','','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6'],
@@ -493,10 +492,11 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 7: AKTIVASI (PSB) ───────────────────────────────────────────
+        // ── SHEET 7: AKTIVASI (photoRowHeight=189) ───────────────────────────
         await buildReportSheet({
             sheetName: 'AKTIVASI',
-            columnsSetup: { widths: [6,12,18,12,12,8,16,15,20,24,24,24,24,24,24,24], alignments: ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center'] },
+            photoRowHeight: 189,
+            columnsSetup: { widths: [11.5,10,18,12,12,8,16,15,20,25.58,25.58,25.58,25.58,25.58,25.58,25.58], alignments: ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO ODP','PORT ODP','REDAM ODP','REDAM ONT','FOTO SN','FOTO RUMAH','SPEEDTEST'],
             headers_r6: ['','','','','','','','','','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6','L5:L6','M5:M6','N5:N6','O5:O6','P5:P6'],
