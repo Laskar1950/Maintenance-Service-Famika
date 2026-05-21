@@ -27,7 +27,7 @@
             </div>
             <div>
                 <h1 id="header-title" class="text-xs font-black text-slate-900 tracking-tight leading-none uppercase">PM TELECOM PORTAL</h1>
-                <p id="header-subtitle" class="text-[10px] text-slate-500 font-medium mt-1">Sistem Pelaporan Terpadu • Famika</p>
+                <p id="header-subtitle" class="text-[10px] text-slate-500 font-medium mt-1">Sistem Pelaporan Terpadu &bull; Famika</p>
             </div>
         </div>
         <div class="bg-slate-100 border border-slate-200 rounded-full px-3 py-1 flex items-center gap-1.5">
@@ -43,7 +43,7 @@
     <div id="view-project-setup" class="space-y-4">
         <div class="bg-white rounded-2xl p-5 border border-slate-200/80">
             <span class="text-xs font-bold text-sky-600 uppercase tracking-wider">Langkah Utama</span>
-            <h2 class="text-base font-black text-slate-900 mt-1">Setup Project Kerja Bulanan 🛠️</h2>
+            <h2 class="text-base font-black text-slate-900 mt-1">Setup Project Kerja Bulanan &#x1F6E0;&#xFE0F;</h2>
             <p class="text-xs text-slate-500 mt-1 leading-relaxed">Sebelum mulai bekerja di lapangan, tentukan atau buat nama project bulanan Anda terlebih dahulu.</p>
         </div>
         <div class="grid grid-cols-2 bg-slate-200/70 p-1 rounded-xl text-xs font-bold">
@@ -55,7 +55,7 @@
             <select id="select_active_project" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3.5 py-3.5 focus:outline-none">
                 <option value="" disabled selected>Memuat daftar project aktif...</option>
             </select>
-            <button onclick="activateSelectedProject()" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Aktifkan Project & Lanjut Kerja</button>
+            <button onclick="activateSelectedProject()" class="w-full bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Aktifkan Project &amp; Lanjut Kerja</button>
         </div>
         <div id="project-panel-create" class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3 hidden">
             <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">Form Pembuatan Project Baru</label>
@@ -86,7 +86,7 @@
                     <option value="" disabled selected>Memuat daftar wilayah...</option>
                 </select>
             </div>
-            <button onclick="createNewProject()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Create & Aktifkan Project</button>
+            <button onclick="createNewProject()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Create &amp; Aktifkan Project</button>
         </div>
     </div>
 
@@ -99,36 +99,92 @@
             </div>
             <button onclick="clearActiveProject()" class="bg-white/20 hover:bg-white/30 text-white text-[9px] font-bold px-3 py-1.5 rounded-lg uppercase tracking-wider transition-all">Ganti Project</button>
         </div>
-        <div class="space-y-2.5">
+        <div class="space-y-2.5" id="menu-list">
             <div onclick="showView('form_odc')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
-                <div class="flex items-center gap-3.5"><div class="bg-sky-50 text-sky-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivitas ODC</h3><p class="text-[10px] text-slate-400 mt-0.5">Preventif box ODC & redaman OPM</p></div></div>
-                <span class="text-slate-300 group-hover:text-sky-600">➔</span>
+                <div class="flex items-center gap-3.5"><div class="bg-sky-50 text-sky-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivitas ODC</h3><p class="text-[10px] text-slate-400 mt-0.5">Preventif box ODC &amp; redaman OPM</p></div></div>
+                <span class="text-slate-300 group-hover:text-sky-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_odp')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
                 <div class="flex items-center gap-3.5"><div class="bg-indigo-50 text-indigo-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivitas ODP</h3><p class="text-[10px] text-slate-400 mt-0.5">Preventif box ODP dengan relasi ODC</p></div></div>
-                <span class="text-slate-300 group-hover:text-indigo-600">➔</span>
+                <span class="text-slate-300 group-hover:text-indigo-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_closure')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
                 <div class="flex items-center gap-3.5"><div class="bg-emerald-50 text-emerald-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Preventif Closure</h3><p class="text-[10px] text-slate-400 mt-0.5">Pendataan fisik sambungan closure kabel</p></div></div>
-                <span class="text-slate-300 group-hover:text-emerald-600">➔</span>
+                <span class="text-slate-300 group-hover:text-emerald-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_span')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
-                <div class="flex items-center gap-3.5"><div class="bg-teal-50 text-teal-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Span Kabel</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemeriksaan fisik bentangan & spare kabel</p></div></div>
-                <span class="text-slate-300 group-hover:text-teal-600">➔</span>
+                <div class="flex items-center gap-3.5"><div class="bg-teal-50 text-teal-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Span Kabel</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemeriksaan fisik bentangan &amp; spare kabel</p></div></div>
+                <span class="text-slate-300 group-hover:text-teal-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_gangguan')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
                 <div class="flex items-center gap-3.5"><div class="bg-purple-50 text-purple-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Penanganan Gangguan</h3><p class="text-[10px] text-slate-400 mt-0.5">Perbaikan kendala jaringan pelanggan</p></div></div>
-                <span class="text-slate-300 group-hover:text-purple-600">➔</span>
+                <span class="text-slate-300 group-hover:text-purple-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_dismantling')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
-                <div class="flex items-center gap-3.5"><div class="bg-rose-50 text-rose-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Dismantling (Cabut)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pencabutan material & dropcore pelanggan</p></div></div>
-                <span class="text-slate-300 group-hover:text-rose-600">➔</span>
+                <div class="flex items-center gap-3.5"><div class="bg-rose-50 text-rose-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Dismantling (Cabut)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pencabutan material &amp; dropcore pelanggan</p></div></div>
+                <span class="text-slate-300 group-hover:text-rose-600">&#x2794;</span>
             </div>
             <div onclick="showView('form_psb')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group">
-                <div class="flex items-center gap-3.5"><div class="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivasi Baru (PSB)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemasangan & uji redaman pelanggan baru</p></div></div>
-                <span class="text-slate-300 group-hover:text-amber-600">➔</span>
+                <div class="flex items-center gap-3.5"><div class="bg-amber-50 text-amber-600 p-2.5 rounded-xl"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04z" /></svg></div><div><h3 class="text-xs font-black text-slate-800 uppercase tracking-wider">Aktivasi Baru (PSB)</h3><p class="text-[10px] text-slate-400 mt-0.5">Pemasangan &amp; uji redaman pelanggan baru</p></div></div>
+                <span class="text-slate-300 group-hover:text-amber-600">&#x2794;</span>
+            </div>
+            <!-- CARD ADMIN: GENERATE REPORT — ditampilkan hanya jika isAdmin=true -->
+            <div id="menu-generate-report" onclick="showView('generate_report')" class="hidden bg-gradient-to-r from-violet-600 to-violet-700 hover:from-violet-700 hover:to-violet-800 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all group shadow-sm">
+                <div class="flex items-center gap-3.5">
+                    <div class="bg-white/20 text-white p-2.5 rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-1.5">
+                            <h3 class="text-xs font-black text-white uppercase tracking-wider">Generate Laporan Excel</h3>
+                            <span class="bg-white/25 text-white text-[8px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">Admin</span>
+                        </div>
+                        <p class="text-[10px] text-violet-200 mt-0.5">Export semua data project ke file .xlsx</p>
+                    </div>
+                </div>
+                <span class="text-white/50 group-hover:text-white">&#x2794;</span>
             </div>
         </div>
+    </div>
+
+    <!-- VIEW: GENERATE REPORT (ADMIN) -->
+    <div id="view-generate-report" class="space-y-4 hidden">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80">
+            <div class="flex items-center gap-2 mb-1">
+                <span class="bg-violet-100 text-violet-600 text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider">Admin Only</span>
+            </div>
+            <h2 class="text-base font-black text-slate-900 mt-1">Generate Laporan Excel &#x1F4CA;</h2>
+            <p class="text-xs text-slate-500 mt-1 leading-relaxed">Pilih project yang ingin diekspor. Semua data (ODC, ODP, Closure, Span, Gangguan, Dismantling, PSB) beserta foto akan dimasukkan ke dalam file Excel.</p>
+        </div>
+
+        <!-- Pilih Project -->
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">
+            <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">Pilih Project yang Akan Diekspor</label>
+            <select id="report_project_select" class="w-full bg-slate-50 border border-slate-200 text-sm font-bold rounded-xl px-3.5 py-3.5 focus:outline-none focus:border-violet-400" onchange="onReportProjectChange()">
+                <option value="" disabled selected>&#x23F3; Memuat daftar project...</option>
+            </select>
+        </div>
+
+        <!-- Ringkasan Data Project -->
+        <div id="report-summary-card" class="bg-white rounded-2xl p-4 border border-slate-200/80 hidden">
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-3">Ringkasan Data Project</p>
+            <div class="grid grid-cols-4 gap-2" id="report-summary-grid"></div>
+        </div>
+
+        <!-- Tombol Download -->
+        <button id="btn-generate-report" onclick="doGenerateReport()" disabled
+            class="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold py-4 px-4 rounded-2xl text-sm transition-all flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            <span id="btn-generate-text">Pilih Project Terlebih Dahulu</span>
+        </button>
+
+        <p class="text-center text-[10px] text-slate-400 leading-relaxed px-2">
+            File .xlsx akan otomatis diunduh atau dibuka oleh browser. Proses generate bisa memakan waktu 10&ndash;30 detik tergantung jumlah data &amp; foto.
+        </p>
     </div>
 
     <!-- VIEW: FORM CONTAINER -->
@@ -159,7 +215,7 @@
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
         </div>
         <h4 class="text-lg font-black text-slate-900">Laporan Terkirim!</h4>
-        <p id="success-detail-text" class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data & foto berhasil tersimpan ke database.</p>
+        <p id="success-detail-text" class="text-xs text-slate-500 mt-2.5 leading-relaxed">Data &amp; foto berhasil tersimpan ke database.</p>
         <button onclick="afterSuccessRedirect()" class="mt-5 w-full bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs py-3.5 px-4 rounded-xl transition-all uppercase tracking-wider">Kembali ke Menu</button>
     </div>
 </div>
@@ -181,13 +237,16 @@ const SUPABASE_URL       = 'https://bwfbntebndkbglmbziij.supabase.co';
 const SUPABASE_URL_REST  = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU';
 const STORAGE_BUCKET     = 'laporan-foto';
+// Sesuaikan dengan URL Vercel / server yang berjalan
+const SERVER_BASE_URL    = 'https://maintenance-service-famika.vercel.app';
 
 let currentActiveTask = 'home';
-let compressedBlobs   = {}; // { index: Blob }
+let compressedBlobs   = {};
 let activeProjectId   = localStorage.getItem('famika_active_project_id')   || '';
 let activeProjectName = localStorage.getItem('famika_active_project_name') || '';
 let activeSiteId      = localStorage.getItem('famika_active_site_id')      || '';
-let technicianUserId  = null; // UUID dari tabel users (diambil saat login)
+let technicianUserId  = null;
+let isAdmin           = false; // akan diset setelah cek role
 
 const tg = window.Telegram?.WebApp;
 let technicianUsername = 'Teknisi Lapangan';
@@ -197,6 +256,29 @@ if (tg) {
     if (u) technicianUsername = u.username || u.first_name || 'Teknisi Lapangan';
 }
 document.getElementById('tech-username').innerText = technicianUsername;
+
+// ============================================================
+// CEK ROLE ADMIN — dipanggil sekali saat load
+// Query ke tabel users by full_name atau username
+// ============================================================
+async function checkAdminRole() {
+    try {
+        // Coba match dengan full_name dulu, lalu fallback ke telegram username
+        const query = `users?or=(full_name.ilike.${encodeURIComponent('%'+technicianUsername+'%')})&select=id,role&limit=1`;
+        const data  = await sb(query);
+        if (data?.[0]) {
+            technicianUserId = data[0].id;
+            isAdmin          = (data[0].role === 'admin');
+        }
+    } catch (e) {
+        console.warn('Gagal cek role admin:', e.message);
+    }
+    // Tampilkan/sembunyikan menu Generate Report
+    const menuCard = document.getElementById('menu-generate-report');
+    if (menuCard) {
+        isAdmin ? menuCard.classList.remove('hidden') : menuCard.classList.add('hidden');
+    }
+}
 
 // ============================================================
 // HELPER: buat field input/select/textarea
@@ -244,7 +326,7 @@ const FORM_DEFINITIONS = {
         subtitle: 'Preventif Box ODC & Redaman OPM',
         table: 'pm_odc',
         photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
-        photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
+        photoLabels: ['Before \u2014 Tutup','Before \u2014 Buka','After \u2014 Tutup','After \u2014 Buka','Foto OPM / Redaman'],
         fields: () => fCard(
             fSectionTitle('Data PM ODC'),
             fDynSelect('odc_id','Kode ODC','Pilih Kode ODC',true),
@@ -258,7 +340,7 @@ const FORM_DEFINITIONS = {
         subtitle: 'Preventif Box ODP dengan Relasi ODC',
         table: 'pm_odp',
         photoKinds: ['before_tutup','before_buka','after_tutup','after_buka','foto_opm'],
-        photoLabels: ['Before — Tutup','Before — Buka','After — Tutup','After — Buka','Foto OPM / Redaman'],
+        photoLabels: ['Before \u2014 Tutup','Before \u2014 Buka','After \u2014 Tutup','After \u2014 Buka','Foto OPM / Redaman'],
         fields: () => fCard(
             fSectionTitle('Data PM ODP'),
             fDynSelect('odc_id','ODC Induk','Memuat daftar ODC...',true,'fetchOdpsForSelectedOdc()'),
@@ -320,10 +402,7 @@ const FORM_DEFINITIONS = {
             fInput('sn_ont_new','SN ONT Baru','Contoh: HWTC1234ABCD',false),
             fInput('sn_ont_old','SN ONT Lama','Contoh: HWTC0000ZZZZ',false),
             fSectionTitle('Waktu Pengerjaan'),
-            `<div class="grid grid-cols-2 gap-3">
-                ${fInput('jam_mulai','Jam Mulai','',true,'time')}
-                ${fInput('jam_selesai','Jam Selesai','',true,'time')}
-            </div>`
+            `<div class="grid grid-cols-2 gap-3">${fInput('jam_mulai','Jam Mulai','',true,'time')}${fInput('jam_selesai','Jam Selesai','',true,'time')}</div>`
         )
     },
     form_dismantling: {
@@ -378,6 +457,7 @@ function showView(viewName) {
     document.getElementById('view-project-setup').classList.add('hidden');
     document.getElementById('view-home').classList.add('hidden');
     document.getElementById('pm-form').classList.add('hidden');
+    document.getElementById('view-generate-report').classList.add('hidden');
 
     const backBtn       = document.getElementById('btn-back-home');
     const logoContainer = document.getElementById('header-logo-container');
@@ -387,15 +467,26 @@ function showView(viewName) {
         document.getElementById('dashboard-active-project-name').innerText = activeProjectName;
         backBtn.classList.add('hidden');
         logoContainer.classList.remove('hidden');
-        document.getElementById('header-title').innerText = 'PM TELECOM PORTAL';
-        document.getElementById('header-subtitle').innerText = 'Sistem Pelaporan Terpadu • Famika';
+        document.getElementById('header-title').innerText    = 'PM TELECOM PORTAL';
+        document.getElementById('header-subtitle').innerText = 'Sistem Pelaporan Terpadu \u2022 Famika';
+        return;
+    }
+
+    if (viewName === 'generate_report') {
+        if (!isAdmin) { showErrorModal('Akses ditolak. Hanya admin yang dapat mengakses fitur ini.'); return; }
+        document.getElementById('view-generate-report').classList.remove('hidden');
+        document.getElementById('header-title').innerText    = 'Generate Laporan';
+        document.getElementById('header-subtitle').innerText = 'Export Excel Per Project';
+        backBtn.classList.remove('hidden');
+        logoContainer.classList.add('hidden');
+        loadAllProjectsForReport();
         return;
     }
 
     const def = FORM_DEFINITIONS[viewName];
     if (!def) return;
 
-    document.getElementById('header-title').innerText   = def.title;
+    document.getElementById('header-title').innerText    = def.title;
     document.getElementById('header-subtitle').innerText = def.subtitle;
     backBtn.classList.remove('hidden');
     logoContainer.classList.add('hidden');
@@ -427,7 +518,100 @@ function showView(viewName) {
 }
 
 // ============================================================
-// HANDLER FOTO — COMPRESS SEBELUM UPLOAD
+// GENERATE REPORT — LOGIKA
+// ============================================================
+async function loadAllProjectsForReport() {
+    const sel = document.getElementById('report_project_select');
+    if (!sel) return;
+    sel.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat...</option>';
+    try {
+        // Ambil semua project (aktif maupun sudah selesai)
+        const projects = await sb('projects?select=id,project_name,site_code,bulan,tahun,status&order=created_at.desc');
+        if (!projects || projects.length === 0) {
+            sel.innerHTML = '<option value="" disabled selected>Belum ada project tersimpan.</option>';
+            return;
+        }
+        const namaBulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+        sel.innerHTML = '<option value="" disabled selected>Pilih project...</option>' +
+            projects.map(p => {
+                const bulanStr = p.bulan ? namaBulan[p.bulan - 1] : '';
+                const label    = `${p.project_name} (${p.site_code}) \u2014 ${bulanStr} ${p.tahun||''}`;
+                return `<option value="${p.id}">${label}</option>`;
+            }).join('');
+    } catch (err) {
+        sel.innerHTML = '<option value="" disabled selected>&#x26A0;&#xFE0F; Gagal memuat project</option>';
+    }
+}
+
+async function onReportProjectChange() {
+    const sel       = document.getElementById('report_project_select');
+    const projectId = sel.value;
+    if (!projectId) return;
+
+    const summaryCard = document.getElementById('report-summary-card');
+    const summaryGrid = document.getElementById('report-summary-grid');
+    const btnGenerate = document.getElementById('btn-generate-report');
+    const btnText     = document.getElementById('btn-generate-text');
+
+    summaryCard.classList.add('hidden');
+    btnGenerate.disabled = true;
+    btnText.innerText    = 'Memuat ringkasan...';
+
+    try {
+        // Hitung jumlah data per modul secara paralel
+        const [odc, odp, closure, span, gangguan, dismantling, psb] = await Promise.all([
+            sb(`pm_odc?period_id=eq.${projectId}&select=id`),
+            sb(`pm_odp?period_id=eq.${projectId}&select=id`),
+            sb(`pm_closure?period_id=eq.${projectId}&select=id`),
+            sb(`pm_span?period_id=eq.${projectId}&select=id`),
+            sb(`corrective_customer?period_id=eq.${projectId}&select=id`),
+            sb(`dismantling_records?period_id=eq.${projectId}&select=id`),
+            sb(`psb_records?period_id=eq.${projectId}&select=id`)
+        ]);
+
+        const stats = [
+            { label: 'ODC',        count: odc?.length        || 0, color: 'bg-sky-50 text-sky-700' },
+            { label: 'ODP',        count: odp?.length        || 0, color: 'bg-indigo-50 text-indigo-700' },
+            { label: 'Closure',    count: closure?.length    || 0, color: 'bg-emerald-50 text-emerald-700' },
+            { label: 'Span',       count: span?.length       || 0, color: 'bg-teal-50 text-teal-700' },
+            { label: 'Gangguan',   count: gangguan?.length   || 0, color: 'bg-purple-50 text-purple-700' },
+            { label: 'Dismantling',count: dismantling?.length|| 0, color: 'bg-rose-50 text-rose-700' },
+            { label: 'PSB',        count: psb?.length        || 0, color: 'bg-amber-50 text-amber-700' },
+        ];
+
+        const totalData = stats.reduce((s, x) => s + x.count, 0);
+
+        summaryGrid.innerHTML = stats.map(s =>
+            `<div class="${s.color} rounded-xl p-2.5 text-center">
+                <p class="text-lg font-black">${s.count}</p>
+                <p class="text-[9px] font-bold uppercase tracking-wider leading-tight mt-0.5">${s.label}</p>
+            </div>`
+        ).join('');
+
+        summaryCard.classList.remove('hidden');
+        btnGenerate.disabled = false;
+        btnText.innerText    = totalData === 0
+            ? 'Download Excel (Kosong)'
+            : `Download Excel (${totalData} data)`;
+
+    } catch (err) {
+        btnText.innerText    = 'Gagal memuat ringkasan';
+        btnGenerate.disabled = true;
+    }
+}
+
+function doGenerateReport() {
+    const sel       = document.getElementById('report_project_select');
+    const projectId = sel.value;
+    if (!projectId) { showErrorModal('Pilih project terlebih dahulu.'); return; }
+
+    const url = `${SERVER_BASE_URL}/api/report/export?project_id=${projectId}`;
+    // Buka di tab baru agar tidak keluar dari Mini App
+    window.open(url, '_blank');
+}
+
+// ============================================================
+// HANDLER FOTO
 // ============================================================
 function handlePhotoSelect(event, index) {
     const file = event.target.files[0];
@@ -446,7 +630,7 @@ function handlePhotoSelect(event, index) {
                 compressedBlobs[index] = blob;
                 document.getElementById('photo_preview_' + index).innerHTML =
                     `<img src="${canvas.toDataURL('image/jpeg',0.75)}" class="w-full rounded-lg object-cover max-h-44" />
-                     <p class="text-[10px] text-emerald-600 font-bold mt-1">✅ Foto siap dikirim</p>`;
+                     <p class="text-[10px] text-emerald-600 font-bold mt-1">&#x2705; Foto siap dikirim</p>`;
             }, 'image/jpeg', 0.75);
         };
         img.src = e.target.result;
@@ -455,13 +639,7 @@ function handlePhotoSelect(event, index) {
 }
 
 // ============================================================
-// SUBMIT
-// Alur:
-//   1. Resolve technician_id dari tabel users
-//   2. Insert data utama → dapat record_id
-//   3. Upload tiap foto ke Storage (non-blocking per foto)
-//   4. Batch insert metadata ke photo_assets
-//   5. Tampilkan sukses dengan info jumlah foto yang berhasil
+// SUBMIT FORM
 // ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
@@ -473,35 +651,29 @@ async function handleSubmit(event) {
     document.getElementById('submit-btn').disabled = true;
 
     try {
-        // --- LANGKAH 1: Resolve technician_id ---
         if (!technicianUserId) {
             try {
                 const uData = await sb(`users?full_name=ilike.${encodeURIComponent('%'+technicianUsername+'%')}&select=id&limit=1`);
                 if (uData?.[0]?.id) technicianUserId = uData[0].id;
-            } catch (e) {
-                console.warn('Tidak bisa resolve technician_id:', e.message);
-            }
+            } catch (e) { console.warn('Tidak bisa resolve technician_id:', e.message); }
         }
 
-        // --- LANGKAH 2: Kumpulkan data form (tanpa foto) ---
         const formData = { period_id: activeProjectId, site_id: activeSiteId };
         document.getElementById('dynamic-form-fields').querySelectorAll('input,select,textarea').forEach(el => {
             if (!el.id) return;
             let val;
-            if (el.type === 'number') val = el.value !== '' ? parseFloat(el.value) : null;
+            if (el.type === 'number')   val = el.value !== '' ? parseFloat(el.value) : null;
             else if (el.type === 'checkbox') val = el.checked;
             else val = el.value || null;
             formData[el.id] = val;
         });
         if (technicianUserId) formData.technician_id = technicianUserId;
 
-        // --- LANGKAH 3: Insert data utama → dapat record_id ---
         document.getElementById('btn-text').innerText = 'Menyimpan laporan...';
         const inserted = await sbPost(def.table, formData);
         const recordId = inserted?.[0]?.id;
         if (!recordId) throw new Error('Gagal mendapatkan ID record yang disimpan.');
 
-        // --- LANGKAH 4: Upload foto ke Storage (non-blocking per foto) ---
         const photoKinds    = def.photoKinds || [];
         const uploadEntries = Object.entries(compressedBlobs);
         let   uploadedCount = 0;
@@ -513,66 +685,31 @@ async function handleSubmit(event) {
             const photoKind = photoKinds[idx] || `foto_${idx + 1}`;
             const ts        = Date.now();
             const filename  = `${currentActiveTask}/${activeProjectId}/${recordId}_${photoKind}_${ts}.jpg`;
-
             document.getElementById('btn-text').innerText = `Mengupload foto (${i+1}/${uploadEntries.length})...`;
-
             try {
                 const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filename}`, {
                     method: 'POST',
-                    headers: {
-                        'apikey'       : SUPABASE_ANON_KEY,
-                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-                        'Content-Type' : 'image/jpeg',
-                        'x-upsert'     : 'true'
-                    },
+                    headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
                     body: blob
                 });
-
-                if (!uploadRes.ok) {
-                    const errBody = await uploadRes.text();
-                    console.warn(`Upload foto ${photoKind} gagal (${uploadRes.status}): ${errBody}`);
-                    continue; // lanjut foto berikutnya, jangan throw
-                }
-
+                if (!uploadRes.ok) { const e = await uploadRes.text(); console.warn(`Upload ${photoKind} gagal: ${e}`); continue; }
                 uploadedCount++;
-                photoAssets.push({
-                    module_name : currentActiveTask,
-                    record_id   : recordId,
-                    photo_kind  : photoKind,
-                    file_path   : filename,
-                    file_name   : `${photoKind}_${ts}.jpg`,
-                    mime_type   : 'image/jpeg',
-                    file_size   : blob.size,
-                    uploaded_by : technicianUserId || null
-                });
-            } catch (uploadErr) {
-                console.warn(`Error upload foto ${photoKind}:`, uploadErr.message);
-                // Tetap lanjut, jangan batalkan seluruh submit
-            }
+                photoAssets.push({ module_name: currentActiveTask, record_id: recordId, photo_kind: photoKind, file_path: filename, file_name: `${photoKind}_${ts}.jpg`, mime_type: 'image/jpeg', file_size: blob.size, uploaded_by: technicianUserId || null });
+            } catch (uploadErr) { console.warn(`Error upload foto ${photoKind}:`, uploadErr.message); }
         }
 
-        // --- LANGKAH 5: Batch insert metadata foto ke photo_assets ---
         if (photoAssets.length > 0) {
             document.getElementById('btn-text').innerText = 'Menyimpan metadata foto...';
-            try {
-                await sbPost('photo_assets', photoAssets);
-            } catch (photoErr) {
-                // Insert foto gagal tidak membatalkan data utama yang sudah masuk
-                console.error('Gagal insert photo_assets:', photoErr.message);
-            }
+            try { await sbPost('photo_assets', photoAssets); } catch (photoErr) { console.error('Gagal insert photo_assets:', photoErr.message); }
         }
 
-        // Tampilkan pesan sukses dengan detail foto
         const totalFoto = uploadEntries.length;
-        const infoFoto = totalFoto === 0
-            ? 'Data berhasil tersimpan (tanpa foto).'
-            : uploadedCount === totalFoto
-                ? `Data & ${uploadedCount} foto berhasil tersimpan.`
-                : `Data tersimpan. Foto: ${uploadedCount}/${totalFoto} berhasil diupload.`;
+        const infoFoto  = totalFoto === 0 ? 'Data berhasil tersimpan (tanpa foto).'
+            : uploadedCount === totalFoto ? `Data & ${uploadedCount} foto berhasil tersimpan.`
+            : `Data tersimpan. Foto: ${uploadedCount}/${totalFoto} berhasil diupload.`;
 
         document.getElementById('success-detail-text').innerText = infoFoto;
         document.getElementById('success-modal').classList.remove('hidden');
-
     } catch (err) {
         showErrorModal('Gagal mengirim: ' + err.message);
     } finally {
@@ -607,12 +744,7 @@ async function sb(endpoint) {
 async function sbPost(table, body) {
     const res = await fetch(`${SUPABASE_URL_REST}/${table}`, {
         method : 'POST',
-        headers: {
-            'apikey'       : SUPABASE_ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-            'Content-Type' : 'application/json',
-            'Prefer'       : 'return=representation'
-        },
+        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify(body)
     });
     const data = await res.json();
@@ -628,6 +760,7 @@ function checkProjectLifecycle() {
         document.getElementById('view-project-setup').classList.remove('hidden');
         document.getElementById('view-home').classList.add('hidden');
         document.getElementById('pm-form').classList.add('hidden');
+        document.getElementById('view-generate-report').classList.add('hidden');
         document.getElementById('btn-back-home').classList.add('hidden');
         document.getElementById('header-logo-container').classList.remove('hidden');
         document.getElementById('header-title').innerText    = 'PM TELECOM PORTAL';
@@ -697,13 +830,9 @@ async function createNewProject() {
     if (!name || !siteCode) { showErrorModal('Lengkapi semua isian.'); return; }
     try {
         const result = await sbPost('projects', {
-            project_name       : name,
-            site_code          : siteCode,
-            site_id            : siteId,
-            bulan              : parseInt(bulan),
-            tahun              : parseInt(tahun),
-            status             : 'active',
-            technician_username: technicianUsername
+            project_name: name, site_code: siteCode, site_id: siteId,
+            bulan: parseInt(bulan), tahun: parseInt(tahun),
+            status: 'active', technician_username: technicianUsername
         });
         activeProjectId   = result[0].id;
         activeProjectName = result[0].project_name;
@@ -728,91 +857,69 @@ function clearActiveProject() {
 async function syncAndRenderOdcDropdown() {
     const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
-    odcSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODC...</option>';
+    odcSelect.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat ODC...</option>';
     try {
         const allOdc = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
-
         let usedOdcIds = new Set();
         if (currentActiveTask === 'form_odc' && activeProjectId) {
-            try {
-                const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`);
-                used.forEach(r => usedOdcIds.add(r.odc_id));
-            } catch { /* abaikan, tampilkan semua */ }
+            try { const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`); used.forEach(r => usedOdcIds.add(r.odc_id)); } catch {}
         }
-
         const isRequired = odcSelect.hasAttribute('required');
-        const firstOpt   = isRequired
-            ? '<option value="" disabled selected>Pilih Kode ODC</option>'
-            : '<option value="">— Tidak dipilih —</option>';
-
-        const available = allOdc.filter(o => !usedOdcIds.has(o.id));
-
+        const firstOpt   = isRequired ? '<option value="" disabled selected>Pilih Kode ODC</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
+        const available  = allOdc.filter(o => !usedOdcIds.has(o.id));
         if (currentActiveTask === 'form_odc' && available.length === 0) {
-            odcSelect.innerHTML = '<option value="" disabled selected>✅ Semua ODC sudah diinput</option>';
+            odcSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODC sudah diinput</option>';
         } else {
             odcSelect.innerHTML = firstOpt + available.map(o => `<option value="${o.id}">${o.odc_code}</option>`).join('');
         }
-    } catch {
-        odcSelect.innerHTML = '<option value="">⚠️ Gagal memuat</option>';
-    }
+    } catch { odcSelect.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat</option>'; }
 }
-
 async function fetchOdpsForSelectedOdc() {
     const odcSelect = document.getElementById('odc_id');
     const odpSelect = document.getElementById('odp_id');
     if (!odpSelect || !odcSelect?.value) return;
     odpSelect.disabled = false;
-    odpSelect.innerHTML = '<option value="" disabled selected>⏳ Memuat ODP...</option>';
+    odpSelect.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat ODP...</option>';
     try {
         const allOdp = await sb(`odp_master?odc_id=eq.${odcSelect.value}&is_active=eq.true&select=id,odp_code,total_port&order=odp_code`);
-
         let usedOdpIds = new Set();
         if (currentActiveTask === 'form_odp' && activeProjectId) {
-            try {
-                const used = await sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`);
-                used.forEach(r => usedOdpIds.add(r.odp_id));
-            } catch { /* abaikan */ }
+            try { const used = await sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`); used.forEach(r => usedOdpIds.add(r.odp_id)); } catch {}
         }
-
         const isRequired = odpSelect.hasAttribute('required');
-        const firstOpt   = isRequired
-            ? '<option value="" disabled selected>Pilih Kode ODP</option>'
-            : '<option value="">— Tidak dipilih —</option>';
-
-        const available = allOdp.filter(o => !usedOdpIds.has(o.id));
-
+        const firstOpt   = isRequired ? '<option value="" disabled selected>Pilih Kode ODP</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
+        const available  = allOdp.filter(o => !usedOdpIds.has(o.id));
         if (currentActiveTask === 'form_odp' && available.length === 0) {
-            odpSelect.innerHTML = '<option value="" disabled selected>✅ Semua ODP sudah diinput</option>';
+            odpSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODP sudah diinput</option>';
         } else {
             odpSelect.innerHTML = firstOpt + available.map(o => `<option value="${o.id}">${o.odp_code} (${o.total_port||8} Port)</option>`).join('');
         }
-    } catch {
-        odpSelect.innerHTML = '<option value="">⚠️ Gagal memuat ODP</option>';
-    }
+    } catch { odpSelect.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat ODP</option>'; }
 }
-
 async function loadAllClosures() {
     const sel = document.getElementById('closure_id');
     if (!sel) return;
-    sel.innerHTML = '<option value="" disabled selected>⏳ Memuat Closure...</option>';
+    sel.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat Closure...</option>';
     try {
         const data = await sb(`closure_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,closure_code&order=closure_code`);
-        sel.innerHTML = '<option value="" disabled selected>Pilih Kode Closure</option>' +
-            data.map(c => `<option value="${c.id}">${c.closure_code}</option>`).join('');
-    } catch { sel.innerHTML = '<option value="">⚠️ Gagal memuat</option>'; }
+        sel.innerHTML = '<option value="" disabled selected>Pilih Kode Closure</option>' + data.map(c => `<option value="${c.id}">${c.closure_code}</option>`).join('');
+    } catch { sel.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat</option>'; }
 }
 async function loadAllSpans() {
     const sel = document.getElementById('span_id');
     if (!sel) return;
-    sel.innerHTML = '<option value="" disabled selected>⏳ Memuat Span...</option>';
+    sel.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat Span...</option>';
     try {
-        const data = await sb(`span_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,span_code&order=span_code`);
-        const first = sel.hasAttribute('required') ? '<option value="" disabled selected>Pilih Span</option>' : '<option value="">— Tidak dipilih —</option>';
+        const data  = await sb(`span_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,span_code&order=span_code`);
+        const first = sel.hasAttribute('required') ? '<option value="" disabled selected>Pilih Span</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
         sel.innerHTML = first + data.map(s => `<option value="${s.id}">${s.span_code}</option>`).join('');
-    } catch { sel.innerHTML = '<option value="">⚠️ Gagal memuat</option>'; }
+    } catch { sel.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat</option>'; }
 }
 
-window.onload = function () { checkProjectLifecycle(); };
+window.onload = function () {
+    checkAdminRole();      // cek role admin terlebih dahulu
+    checkProjectLifecycle();
+};
 </script>
 </body>
 </html>
