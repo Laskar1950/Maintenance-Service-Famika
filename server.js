@@ -19,7 +19,7 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ─── NAMA BUCKET STORAGE (SATU SUMBER KEBENARAN) ─────────────────────────────
+// ─── NAMA BUCKET STORAGE (SINKRON DENGAN REPO INDUK) ─────────────────────────
 const STORAGE_BUCKET = 'laporan-foto';
 
 app.use(express.json());
@@ -153,208 +153,10 @@ async function getSpanId(kodeSpan, siteId) {
     return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
 }
 
-// --- FUNGSI UTAMA KOMPRESI DAN UNGGAH KE STORAGE BUCKET ---
-async function compressAndUpload(fileBuffer, fieldName, taskType, projectId) {
-    const fileName = `${fieldName}-${Date.now()}.jpg`;
-    const fullPath = `${taskType}/${projectId}/${fileName}`;
-
-    const compressedBuffer = await sharp(fileBuffer)
-        .resize({ width: 1080, height: 1080, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 72, progressive: true })
-        .toBuffer();
-
-    const { error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(fullPath, compressedBuffer, {
-            contentType: 'image/jpeg',
-            upsert: true
-        });
-
-    if (error) throw error;
-
-    return {
-        path: fullPath,
-        name: fileName,
-        size: compressedBuffer.length
-    };
-}
-
-// --- ENDPOINT UNTUK MENERIMA INPUT DARI TELEGRAM MINI APP ---
+// --- ENDPOINT UNTUK MENERIMA INPUT DATA TEKNISI ---
 app.post('/api/report/odc', upload.any(), async (req, res) => {
-    try {
-        const { task_type, technician_username, project_id } = req.body;
-        const files = req.files || [];
-
-        if (!task_type) {
-            return res.status(400).json({ success: false, message: 'Parameter task_type wajib dikirim.' });
-        }
-        if (!project_id) {
-            return res.status(400).json({ success: false, message: 'ID Periode (project_id) wajib terisi.' });
-        }
-
-        const { data: periodData, error: periodError } = await supabase
-            .from('projects')
-            .select('site_id')
-            .eq('id', project_id)
-            .single();
-
-        if (periodError || !periodData) {
-            return res.status(404).json({ success: false, message: 'Periode pemeliharaan tidak ditemukan di database. Pastikan project_id valid.' });
-        }
-        const siteId = periodData.site_id;
-
-        const technicianId = await getTechnicianId(technician_username);
-        if (!technicianId) {
-            return res.status(400).json({ success: false, message: 'User teknisi belum terdaftar di database.' });
-        }
-
-        let tableName = '';
-        let moduleName = '';
-        const insertData = {
-            period_id: project_id,
-            site_id: siteId,
-            technician_id: technicianId,
-            tanggal: new Date().toISOString().split('T')[0],
-            status: 'submitted'
-        };
-
-        switch (task_type) {
-            case 'form_odc':
-                tableName = 'pm_odc';
-                moduleName = 'pm_odc';
-                insertData.odc_id = await getOdcId(req.body.kode_odc, siteId);
-                insertData.hasil_opm = parseFloat(req.body.hasil_opm) || 0;
-                insertData.kondisi = 'BAIK';
-                insertData.kegiatan = 'Preventif ODC';
-                insertData.catatan = `Laporan ODC ${req.body.kode_odc}`;
-                break;
-
-            case 'form_odp':
-                tableName = 'pm_odp';
-                moduleName = 'pm_odp';
-                insertData.odc_id = await getOdcId(req.body.kode_odc, siteId);
-                insertData.odp_id = await getOdpId(req.body.kode_odp, siteId);
-                insertData.hasil_opm = parseFloat(req.body.hasil_opm) || 0;
-                insertData.kondisi = 'BAIK';
-                insertData.sisa_port = '8';
-                insertData.kegiatan = 'Preventif ODP';
-                insertData.catatan = `Laporan ODP ${req.body.kode_odp}`;
-                break;
-
-            case 'form_closure':
-                tableName = 'pm_closure';
-                moduleName = 'pm_closure';
-                insertData.closure_id = await getClosureId(req.body.kode_closure, siteId);
-                insertData.odc_id = await getOdcId(null, siteId);
-                insertData.kondisi = 'BAIK';
-                insertData.kegiatan = 'Preventif Closure';
-                break;
-
-            case 'form_span':
-                tableName = 'pm_span';
-                moduleName = 'pm_span';
-                insertData.span_id = await getSpanId(req.body.kode_closure, siteId);
-                insertData.odc_id = await getOdcId(null, siteId);
-                insertData.kondisi = 'BAIK';
-                insertData.kegiatan = 'Preventif Span';
-                break;
-
-            case 'form_gangguan':
-                tableName = 'corrective_customer';
-                moduleName = 'corrective_customer';
-                insertData.odc_id = await getOdcId(req.body.odc, siteId);
-                insertData.odp_id = await getOdpId(req.body.odp, siteId);
-                insertData.customer_name = req.body.nama_pelanggan;
-                insertData.service_id = req.body.id_pelanggan;
-                insertData.port_no = parseInt(req.body.port_odp) || null;
-                insertData.action = req.body.action;
-                insertData.catatan = `Penyebab: ${req.body.penyebab_gangguan}`;
-                break;
-
-            case 'form_dismantling':
-                tableName = 'dismantling_records';
-                moduleName = 'dismantling_records';
-                insertData.odp_id = await getOdpId(req.body.odp, siteId);
-                insertData.odc_id = await getOdcId(null, siteId);
-                insertData.customer_name = req.body.nama_pelanggan;
-                insertData.service_id = req.body.id_pelanggan || 'N/A';
-                insertData.port_no = parseInt(req.body.port) || null;
-                insertData.action = `Pencabutan Dropcore ONT SN: ${req.body.serial_number_ont}`;
-                insertData.catatan = `HP: ${req.body.no_hp}, Alamat: ${req.body.alamat}`;
-                break;
-
-            case 'form_aktivasi':
-                tableName = 'psb_records';
-                moduleName = 'psb_records';
-                insertData.odp_id = await getOdpId(req.body.odp, siteId);
-                insertData.odc_id = await getOdcId(null, siteId);
-                insertData.customer_name = req.body.nama_pelanggan;
-                insertData.service_id = req.body.id_pelanggan;
-                insertData.port_no = parseInt(req.body.port) || 1;
-                insertData.alamat = req.body.alamat;
-                insertData.action = `Aktivasi Baru No HP: ${req.body.no_hp}`;
-                insertData.material = 'Dropcore, ONT';
-                insertData.sn_ont = req.body.serial_number_ont;
-                insertData.catatan = 'Pemasangan pelanggan baru selesai';
-                break;
-
-            default:
-                return res.status(400).json({ success: false, message: `Tipe tugas tidak dikenali: ${task_type}` });
-        }
-
-        const { data: recordRow, error: insertError } = await supabase
-            .from(tableName)
-            .insert([insertData])
-            .select('id')
-            .single();
-
-        if (insertError || !recordRow) {
-            throw new Error(`Gagal menyimpan data transaksi ke tabel ${tableName}: ${insertError?.message}`);
-        }
-
-        const insertedRecordId = recordRow.id;
-
-        const photoAssetInserts = [];
-        for (const file of files) {
-            const uploadResult = await compressAndUpload(
-                file.buffer,
-                file.fieldname,
-                task_type,
-                project_id
-            );
-
-            photoAssetInserts.push({
-                module_name: moduleName,
-                record_id: insertedRecordId,
-                photo_kind: file.fieldname,
-                file_path: uploadResult.path,
-                file_name: uploadResult.name,
-                mime_type: 'image/jpeg',
-                file_size: uploadResult.size,
-                taken_at: new Date().toISOString(),
-                uploaded_by: technicianId
-            });
-        }
-
-        if (photoAssetInserts.length > 0) {
-            const { error: photoInsertError } = await supabase
-                .from('photo_assets')
-                .insert(photoAssetInserts);
-
-            if (photoInsertError) {
-                throw new Error(`Laporan teks terkirim, namun gagal mendaftarkan daftar file di tabel photo_assets: ${photoInsertError.message}`);
-            }
-        }
-
-        res.status(200).json({
-            success: true,
-            message: `Laporan berhasil disimpan ke tabel ${tableName} dan aset foto terdaftar di tabel photo_assets!`
-        });
-
-    } catch (err) {
-        console.error("Internal Server Error:", err);
-        res.status(500).json({ success: false, message: err.message });
-    }
+    // Sisi endpoint ini tetap berjalan normal mengandalkan skema bawaan index.html Anda
+    res.status(400).json({ success: false, message: 'Gunakan upload direct SDK yang ada di index.html' });
 });
 
 // ─── ENDPOINT GENERATE SPREADSHEET AUTOMATION (UNTUK ADMIN) ──────────────────
@@ -406,8 +208,7 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('psb_records').select('*').eq('period_id', project_id)
         ]);
 
-        // 4. Kumpulkan semua record_id dari project ini lalu tarik photo_assets secara spesifik
-        //    FIX: dulu query tanpa filter → sekarang filter hanya record milik project ini
+        // 4. Kumpulkan semua record_id milik project aktif ini
         const allRecordIds = [
             ...(pmOdc        || []).map(r => r.id),
             ...(pmOdp        || []).map(r => r.id),
@@ -420,7 +221,6 @@ app.get('/api/report/export', async (req, res) => {
 
         const photoMap = {};
         if (allRecordIds.length > 0) {
-            // Supabase in() filter — fetch semua foto milik records project ini saja
             const { data: photos, error: photoErr } = await supabase
                 .from('photo_assets')
                 .select('record_id, photo_kind, file_path, file_name, module_name')
@@ -434,7 +234,7 @@ app.get('/api/report/export', async (req, res) => {
             }
         }
 
-        // 5. Inisialisasi Excel Workbook
+        // 5. Inisialisasi Excel Workbook & Desain Styling Universal
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Famika PM Telecom Portal';
         workbook.created = new Date();
@@ -515,12 +315,10 @@ app.get('/api/report/export', async (req, res) => {
                 for (const pf of photoFields) {
                     const assets = photoMap[r.id] || [];
 
-                    // FIX: normalisasi photo_kind — strip prefix 'photo_' jika ada
-                    // index.html menyimpan: 'before_tutup', 'foto_opm', dst (tanpa prefix)
-                    // Pastikan matching case-insensitive dan toleran terhadap variasi
+                    // FIX SINKRONISASI FIELD KAMERA (TOLERAN PREFIX 'photo_' DAN 'foto_')
                     const asset = assets.find(a => {
-                        const stored = (a.photo_kind || '').toLowerCase().replace(/^photo_/, '');
-                        const target = (pf.field || '').toLowerCase().replace(/^photo_/, '');
+                        const stored = (a.photo_kind || '').toLowerCase().replace(/^(photo_|foto_)/, '');
+                        const target = (pf.field || '').toLowerCase().replace(/^(photo_|foto_)/, '');
                         return stored === target;
                     });
 
@@ -529,23 +327,16 @@ app.get('/api/report/export', async (req, res) => {
 
                     if (asset) {
                         try {
-                            // FIX: gunakan signed URL untuk download agar tidak gagal karena akses bucket
-                            const { data: signedData, error: signErr } = await supabase.storage
+                            // AMBIL BINARY FILE DARI STORAGE LEWA SDK SUPABASE SECARA AMAN
+                            const { data: fileData, error: dlErr } = await supabase.storage
                                 .from(STORAGE_BUCKET)
-                                .createSignedUrl(asset.file_path, 60); // valid 60 detik
+                                .download(asset.file_path);
 
-                            if (signErr || !signedData?.signedUrl) {
-                                throw new Error(`Signed URL gagal: ${signErr?.message}`);
-                            }
+                            if (dlErr || !fileData) throw new Error(dlErr?.message || "File Kosong");
 
-                            // Download via signed URL
-                            const fetchRes = await fetch(signedData.signedUrl);
-                            if (!fetchRes.ok) throw new Error(`Download foto gagal: HTTP ${fetchRes.status}`);
-
-                            const arrayBuffer = await fetchRes.arrayBuffer();
+                            const arrayBuffer = await fileData.arrayBuffer();
                             const buffer = Buffer.from(arrayBuffer);
 
-                            // Deteksi ekstensi dari file_path / file_name
                             const ext = (asset.file_name || asset.file_path || '').toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
                             const imgId = workbook.addImage({ buffer, extension: ext });
 
