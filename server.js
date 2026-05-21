@@ -6,12 +6,9 @@ const ExcelJS = require('exceljs');
 
 const app = express();
 
-// Konfigurasi parser file menggunakan penyimpanan memori (buffer)
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ─── HUBUNGKAN KE SUPABASE VIA ENVIRONMENT VARIABLES ─────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL;
-// UTAMAKAN MENGGUNAKAN SERVICE ROLE KEY UNTUK BYPASS ATURAN RLS DI BACKEND
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_KEY) {
@@ -19,169 +16,209 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-
-// ─── NAMA BUCKET STORAGE (SINKRON DENGAN REPO INDUK) ─────────────────────────
 const STORAGE_BUCKET = 'laporan-foto';
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Tambahan CORS header agar bisa dipanggil dari Mini App Telegram
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
     next();
 });
 
-// Halaman utama server untuk checkup koneksi
 app.get('/', (req, res) => {
     res.status(200).send('🚀 Server Portal Pelaporan Famika Aktif & Terhubung ke Supabase!');
 });
 
-// --- HELPER LOOKUP UNTUK MENGHINDARI EROR FOREIGN KEY CONSTRAINT ---
+// ─── HELPER: Download dari Storage lalu konversi ke JPEG via sharp ────────────
+// Ini memastikan semua format (HEIC, WebP, PNG, dll) bisa masuk ke ExcelJS
+async function downloadAsJpegBuffer(filePath) {
+    const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .download(filePath);
+
+    if (error || !data) {
+        console.warn(`[FAMIKA] Gagal download: ${filePath} —`, error?.message);
+        return null;
+    }
+
+    try {
+        const ab  = await data.arrayBuffer();
+        const raw = Buffer.from(ab);
+        // Konversi ke JPEG via sharp: menangani semua format kamera HP (HEIC, WebP, PNG, dll)
+        const jpegBuf = await sharp(raw)
+            .rotate()           // auto-rotate berdasarkan EXIF orientation
+            .resize({ width: 800, withoutEnlargement: true })
+            .jpeg({ quality: 80 })
+            .toBuffer();
+        return jpegBuf;
+    } catch (e) {
+        console.error(`[FAMIKA] sharp gagal konversi ${filePath}:`, e.message);
+        return null;
+    }
+}
+
+// ─── HELPER LOOKUP ─────────────────────────────────────────────────────────────
 async function getTechnicianId(username) {
     if (username) {
-        const { data } = await supabase
-            .from('users')
-            .select('id')
-            .or(`full_name.eq.${username},username.eq.${username}`)
-            .limit(1);
+        const { data } = await supabase.from('users').select('id').or(`full_name.eq.${username},username.eq.${username}`).limit(1);
         if (data && data.length > 0) return data[0].id;
     }
-    const { data: fallback } = await supabase
-        .from('users')
-        .select('id')
-        .eq('is_active', true)
-        .limit(1);
+    const { data: fallback } = await supabase.from('users').select('id').eq('is_active', true).limit(1);
     if (fallback && fallback.length > 0) return fallback[0].id;
-
-    const { data: globalFallback } = await supabase
-        .from('users')
-        .select('id')
-        .limit(1);
-    return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
+    const { data: gf } = await supabase.from('users').select('id').limit(1);
+    return gf && gf.length > 0 ? gf[0].id : null;
 }
-
 async function getOdcId(kodeOdc, siteId) {
-    if (kodeOdc) {
-        const { data } = await supabase
-            .from('odc_master')
-            .select('id')
-            .eq('odc_code', kodeOdc)
-            .limit(1);
-        if (data && data.length > 0) return data[0].id;
-    }
-    const { data: fallback } = await supabase
-        .from('odc_master')
-        .select('id')
-        .eq('site_id', siteId)
-        .limit(1);
-    if (fallback && fallback.length > 0) return fallback[0].id;
-
-    const { data: globalFallback } = await supabase
-        .from('odc_master')
-        .select('id')
-        .limit(1);
-    return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
+    if (kodeOdc) { const { data } = await supabase.from('odc_master').select('id').eq('odc_code', kodeOdc).limit(1); if (data && data.length > 0) return data[0].id; }
+    const { data: f } = await supabase.from('odc_master').select('id').eq('site_id', siteId).limit(1);
+    if (f && f.length > 0) return f[0].id;
+    const { data: gf } = await supabase.from('odc_master').select('id').limit(1);
+    return gf && gf.length > 0 ? gf[0].id : null;
 }
-
 async function getOdpId(kodeOdp, siteId) {
-    if (kodeOdp) {
-        const { data } = await supabase
-            .from('odp_master')
-            .select('id')
-            .eq('odp_code', kodeOdp)
-            .limit(1);
-        if (data && data.length > 0) return data[0].id;
-    }
-    const { data: fallback } = await supabase
-        .from('odp_master')
-        .select('id')
-        .eq('site_id', siteId)
-        .limit(1);
-    if (fallback && fallback.length > 0) return fallback[0].id;
-
-    const { data: globalFallback } = await supabase
-        .from('odp_master')
-        .select('id')
-        .limit(1);
-    return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
+    if (kodeOdp) { const { data } = await supabase.from('odp_master').select('id').eq('odp_code', kodeOdp).limit(1); if (data && data.length > 0) return data[0].id; }
+    const { data: f } = await supabase.from('odp_master').select('id').eq('site_id', siteId).limit(1);
+    if (f && f.length > 0) return f[0].id;
+    const { data: gf } = await supabase.from('odp_master').select('id').limit(1);
+    return gf && gf.length > 0 ? gf[0].id : null;
 }
-
 async function getClosureId(kodeClosure, siteId) {
-    if (kodeClosure) {
-        const { data } = await supabase
-            .from('closure_master')
-            .select('id')
-            .eq('closure_code', kodeClosure)
-            .limit(1);
-        if (data && data.length > 0) return data[0].id;
-    }
-    const { data: fallback } = await supabase
-        .from('closure_master')
-        .select('id')
-        .eq('site_id', siteId)
-        .limit(1);
-    if (fallback && fallback.length > 0) return fallback[0].id;
-
-    const { data: globalFallback } = await supabase
-        .from('closure_master')
-        .select('id')
-        .limit(1);
-    return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
+    if (kodeClosure) { const { data } = await supabase.from('closure_master').select('id').eq('closure_code', kodeClosure).limit(1); if (data && data.length > 0) return data[0].id; }
+    const { data: f } = await supabase.from('closure_master').select('id').eq('site_id', siteId).limit(1);
+    if (f && f.length > 0) return f[0].id;
+    const { data: gf } = await supabase.from('closure_master').select('id').limit(1);
+    return gf && gf.length > 0 ? gf[0].id : null;
 }
-
 async function getSpanId(kodeSpan, siteId) {
-    if (kodeSpan) {
-        const { data } = await supabase
-            .from('span_master')
-            .select('id')
-            .eq('span_code', kodeSpan)
-            .limit(1);
-        if (data && data.length > 0) return data[0].id;
-    }
-    const { data: fallback } = await supabase
-        .from('span_master')
-        .select('id')
-        .eq('site_id', siteId)
-        .limit(1);
-    if (fallback && fallback.length > 0) return fallback[0].id;
-
-    const { data: globalFallback } = await supabase
-        .from('span_master')
-        .select('id')
-        .limit(1);
-    return globalFallback && globalFallback.length > 0 ? globalFallback[0].id : null;
+    if (kodeSpan) { const { data } = await supabase.from('span_master').select('id').eq('span_code', kodeSpan).limit(1); if (data && data.length > 0) return data[0].id; }
+    const { data: f } = await supabase.from('span_master').select('id').eq('site_id', siteId).limit(1);
+    if (f && f.length > 0) return f[0].id;
+    const { data: gf } = await supabase.from('span_master').select('id').limit(1);
+    return gf && gf.length > 0 ? gf[0].id : null;
 }
 
-// --- ENDPOINT UNTUK MENERIMA INPUT DATA TEKNISI ---
 app.post('/api/report/odc', upload.any(), async (req, res) => {
     res.status(400).json({ success: false, message: 'Gunakan upload direct SDK yang ada di index.html' });
 });
 
-// ─── ENDPOINT GENERATE SPREADSHEET AUTOMATION (UNTUK ADMIN) ──────────────────
+// ─── ENDPOINT PREVIEW FOTO (BARU) ─────────────────────────────────────────────
+// GET /api/report/preview?project_id=xxx
+// Mengembalikan halaman HTML berisi semua foto dari project tersebut
+// sehingga admin bisa verifikasi foto sebelum download Excel
+app.get('/api/report/preview', async (req, res) => {
+    try {
+        const { project_id } = req.query;
+        if (!project_id) return res.status(400).send('<h1>Error: project_id wajib diisi</h1>');
+
+        const { data: project } = await supabase.from('projects').select('project_name,site_code,bulan,tahun').eq('id', project_id).single();
+        if (!project) return res.status(404).send('<h1>Project tidak ditemukan</h1>');
+
+        const namaBulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+        const periodeStr = `${namaBulan[project.bulan - 1]} ${project.tahun}`;
+
+        // Ambil semua record ID milik project
+        const tables = [
+            { name: 'pm_odc',              label: 'ODC' },
+            { name: 'pm_odp',              label: 'ODP' },
+            { name: 'pm_closure',          label: 'Closure' },
+            { name: 'pm_span',             label: 'Span Kabel' },
+            { name: 'corrective_customer', label: 'Gangguan' },
+            { name: 'dismantling_records', label: 'Dismantling' },
+            { name: 'psb_records',         label: 'Aktivasi PSB' },
+        ];
+
+        const allRecordIds = [];
+        const recordModuleMap = {};
+        for (const t of tables) {
+            const { data: rows } = await supabase.from(t.name).select('id').eq('period_id', project_id);
+            (rows || []).forEach(r => { allRecordIds.push(r.id); recordModuleMap[r.id] = t.label; });
+        }
+
+        if (allRecordIds.length === 0) {
+            return res.send(`<html><body style="font-family:Arial;padding:20px"><h2>Preview Foto — ${project.project_name}</h2><p>Belum ada data untuk project ini.</p></body></html>`);
+        }
+
+        const { data: photos } = await supabase
+            .from('photo_assets')
+            .select('record_id, photo_kind, file_path, file_name')
+            .in('record_id', allRecordIds);
+
+        if (!photos || photos.length === 0) {
+            return res.send(`<html><body style="font-family:Arial;padding:20px"><h2>Preview Foto — ${project.project_name}</h2><p>Belum ada foto tersimpan untuk project ini.</p></body></html>`);
+        }
+
+        // Generate signed URL (valid 60 menit) untuk setiap foto
+        const photoRows = [];
+        for (const p of photos) {
+            const { data: signedData, error: signErr } = await supabase.storage
+                .from(STORAGE_BUCKET)
+                .createSignedUrl(p.file_path, 3600);
+
+            photoRows.push({
+                module:     recordModuleMap[p.record_id] || p.module_name || '-',
+                photo_kind: p.photo_kind,
+                file_name:  p.file_name,
+                url:        signErr ? null : signedData?.signedUrl
+            });
+        }
+
+        // Render HTML preview
+        const cards = photoRows.map(p => `
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px;break-inside:avoid">
+                <p style="margin:0 0 4px;font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.05em">${p.module} &mdash; ${p.photo_kind}</p>
+                <p style="margin:0 0 8px;font-size:9px;color:#94a3b8">${p.file_name}</p>
+                ${ p.url
+                    ? `<img src="${p.url}" style="width:100%;border-radius:8px;object-fit:cover;max-height:200px" loading="lazy" onerror="this.outerHTML='<div style=background:#fee2e2;padding:12px;border-radius:8px;font-size:11px;color:#ef4444>&#x274C; Gagal load gambar</div>'" />`
+                    : `<div style="background:#fee2e2;padding:12px;border-radius:8px;font-size:11px;color:#ef4444">&#x274C; Gagal buat URL</div>`
+                }
+            </div>`).join('');
+
+        const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Preview Foto — ${project.project_name}</title>
+<style>
+  body { margin:0; background:#f1f5f9; font-family:Arial,sans-serif; padding:16px; }
+  h1 { font-size:18px; font-weight:900; color:#1e293b; margin:0 0 2px; }
+  p.sub { font-size:12px; color:#64748b; margin:0 0 16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:12px; }
+  .badge { display:inline-block; background:#7c3aed; color:#fff; font-size:10px; font-weight:700; padding:3px 8px; border-radius:6px; margin-bottom:12px; }
+  .btn { display:block; margin:0 auto 16px; background:#7c3aed; color:#fff; border:none; padding:12px 24px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; text-decoration:none; text-align:center; }
+</style>
+</head>
+<body>
+<span class="badge">📊 Admin Preview</span>
+<h1>${project.project_name}</h1>
+<p class="sub">${project.site_code} &bull; ${periodeStr} &bull; ${photoRows.length} foto ditemukan</p>
+<a class="btn" href="/api/report/export?project_id=${project_id}" target="_blank">⬇️ Download Excel</a>
+<div class="grid">${cards}</div>
+</body>
+</html>`;
+
+        res.send(html);
+
+    } catch (err) {
+        console.error('Preview error:', err);
+        res.status(500).send(`<h1>Error</h1><p>${err.message}</p>`);
+    }
+});
+
+// ─── ENDPOINT GENERATE EXCEL ──────────────────────────────────────────────────
 app.get('/api/report/export', async (req, res) => {
     try {
         const { project_id } = req.query;
-        if (!project_id) {
-            return res.status(400).send('<h1>Error: Parameter project_id wajib dikirim!</h1>');
-        }
+        if (!project_id) return res.status(400).send('<h1>Error: Parameter project_id wajib dikirim!</h1>');
 
-        // 1. Tarik Data Project Bulanan
-        const { data: project, error: projErr } = await supabase
-            .from('projects')
-            .select('*')
-            .eq('id', project_id)
-            .single();
-
-        if (projErr || !project) {
-            return res.status(404).send('<h1>Error: Project kerja bulanan tidak ditemukan!</h1>');
-        }
+        const { data: project, error: projErr } = await supabase.from('projects').select('*').eq('id', project_id).single();
+        if (projErr || !project) return res.status(404).send('<h1>Error: Project tidak ditemukan!</h1>');
 
         const namaBulan = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
         const stringBulanText = `${namaBulan[project.bulan - 1]} ${project.tahun}`;
 
-        // 2. Tarik Semua Data Master untuk Lookup Cepat di Memori
         const [{ data: odcMaster }, { data: odpMaster }, { data: closureMaster }, { data: spanMaster }] = await Promise.all([
             supabase.from('odc_master').select('*'),
             supabase.from('odp_master').select('*'),
@@ -189,16 +226,7 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('span_master').select('*')
         ]);
 
-        // 3. Tarik Seluruh Tabel Transaksi Pekerjaan untuk Project_id Terkait
-        const [
-            { data: pmOdc },
-            { data: pmOdp },
-            { data: pmClosure },
-            { data: pmSpan },
-            { data: corrective },
-            { data: dismantling },
-            { data: psb }
-        ] = await Promise.all([
+        const [{ data: pmOdc }, { data: pmOdp }, { data: pmClosure }, { data: pmSpan }, { data: corrective }, { data: dismantling }, { data: psb }] = await Promise.all([
             supabase.from('pm_odc').select('*').eq('period_id', project_id),
             supabase.from('pm_odp').select('*').eq('period_id', project_id),
             supabase.from('pm_closure').select('*').eq('period_id', project_id),
@@ -208,7 +236,6 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('psb_records').select('*').eq('period_id', project_id)
         ]);
 
-        // 4. Kumpulkan semua record_id milik project aktif ini
         const allRecordIds = [
             ...(pmOdc        || []).map(r => r.id),
             ...(pmOdp        || []).map(r => r.id),
@@ -225,7 +252,6 @@ app.get('/api/report/export', async (req, res) => {
                 .from('photo_assets')
                 .select('record_id, photo_kind, file_path, file_name, module_name')
                 .in('record_id', allRecordIds);
-
             if (!photoErr && photos) {
                 photos.forEach(p => {
                     if (!photoMap[p.record_id]) photoMap[p.record_id] = [];
@@ -234,7 +260,6 @@ app.get('/api/report/export', async (req, res) => {
             }
         }
 
-        // 5. Inisialisasi Excel Workbook & Desain Styling Universal
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Famika PM Telecom Portal';
         workbook.created = new Date();
@@ -252,9 +277,7 @@ app.get('/api/report/export', async (req, res) => {
         function applyBordersToRange(ws, startCol, startRow, endCol, endRow) {
             for (let r = startRow; r <= endRow; r++) {
                 const wsRow = ws.getRow(r);
-                for (let c = startCol; c <= endCol; c++) {
-                    wsRow.getCell(c).border = borderStyle;
-                }
+                for (let c = startCol; c <= endCol; c++) wsRow.getCell(c).border = borderStyle;
             }
         }
 
@@ -265,15 +288,12 @@ app.get('/api/report/export', async (req, res) => {
             ws.getCell('A1').value = isCorrective ? 'Corrective Manage Service' : 'Preventive Manage service';
             ws.getCell('A1').font = { name: 'Arial', size: 14, bold: true };
             ws.getRow(1).height = 24;
-
             ws.getCell('A2').value = `Stasiun : ${project.site_code.split(' - ')[1] || project.site_code}`;
             ws.getCell('A2').font = { name: 'Arial', size: 11, bold: true };
             ws.getRow(2).height = 18;
-
             ws.getCell('A3').value = `Periode : ${stringBulanText}`;
             ws.getCell('A3').font = { name: 'Arial', size: 11, bold: true };
             ws.getRow(3).height = 18;
-
             ws.getRow(4).height = 12;
 
             columnsSetup.widths.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
@@ -282,59 +302,34 @@ app.get('/api/report/export', async (req, res) => {
             r5.height = 20;
             headers_r5.forEach((val, i) => {
                 const cell = r5.getCell(i + 1);
-                cell.value = val;
-                cell.font  = boldFont;
-                cell.fill  = tableHeaderFill;
+                cell.value = val; cell.font = boldFont; cell.fill = tableHeaderFill;
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
-
             const r6 = ws.getRow(6);
             r6.height = 20;
             headers_r6.forEach((val, i) => {
                 const cell = r6.getCell(i + 1);
-                cell.value = val;
-                cell.font  = boldFont;
-                cell.fill  = tableHeaderFill;
+                cell.value = val; cell.font = boldFont; cell.fill = tableHeaderFill;
                 cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
             });
-
             mergeSpecs.forEach(m => { ws.mergeCells(m); });
 
-            // ─────────────────────────────────────────────────────────────────────────────
-            // SINKRONISASI & DOWNLOAD FOTO SECARA PARALEL (BANYAK FOTO SEKALIGUS)
-            // Langkah ini memotong loading time dari 15 detik menjadi hanya 1 detik!
-            // ─────────────────────────────────────────────────────────────────────────────
+            // ── Download & konversi semua foto secara paralel via sharp ────────
             const downloadPromises = [];
             rowsData.forEach(r => {
                 const assets = photoMap[r.id] || [];
                 photoFields.forEach(pf => {
                     const asset = assets.find(a => {
                         const stored = (a.photo_kind || '').toLowerCase().replace(/^(photo_|foto_)/, '');
-                        const target = (pf.field || '').toLowerCase().replace(/^(photo_|foto_)/, '');
+                        const target = (pf.field    || '').toLowerCase().replace(/^(photo_|foto_)/, '');
                         return stored === target;
                     });
                     if (asset) {
                         downloadPromises.push(
-                            supabase.storage
-                                .from(STORAGE_BUCKET)
-                                .download(asset.file_path)
-                                .then(({ data, error }) => {
-                                    if (error || !data) {
-                                        console.warn(`[FAMIKA] Gagal download file ${asset.file_path}:`, error?.message);
-                                        return null;
-                                    }
-                                    return data.arrayBuffer().then(ab => ({
-                                        recordId: r.id,
-                                        field: pf.field,
-                                        col: pf.col,
-                                        buffer: Buffer.from(ab),
-                                        fileName: asset.file_name || asset.file_path
-                                    }));
-                                })
-                                .catch(err => {
-                                    console.error(`[FAMIKA] Gagal mengekstrak arrayBuffer:`, err.message);
-                                    return null;
-                                })
+                            downloadAsJpegBuffer(asset.file_path).then(jpegBuf => {
+                                if (!jpegBuf) return null;
+                                return { recordId: r.id, field: pf.field, col: pf.col, buffer: jpegBuf };
+                            })
                         );
                     }
                 });
@@ -343,15 +338,10 @@ app.get('/api/report/export', async (req, res) => {
             const downloadedAssets = await Promise.all(downloadPromises);
             const activePhotoMap = {};
             downloadedAssets.forEach(asset => {
-                if (asset) {
-                    const key = `${asset.recordId}_${asset.field}`;
-                    activePhotoMap[key] = asset;
-                }
+                if (asset) activePhotoMap[`${asset.recordId}_${asset.field}`] = asset;
             });
 
-            // ─────────────────────────────────────────────────────────────────────────────
-            // INPUT DATA KE EXCEL ROW BY ROW
-            // ─────────────────────────────────────────────────────────────────────────────
+            // ── Tulis data row by row ──────────────────────────────────────────
             let curRow = 7;
             for (const r of rowsData) {
                 const wsRow = ws.getRow(curRow);
@@ -359,40 +349,34 @@ app.get('/api/report/export', async (req, res) => {
 
                 r.data.forEach((val, colIdx) => {
                     const cell = wsRow.getCell(colIdx + 1);
-                    cell.value = val;
-                    cell.font  = globalFont;
+                    cell.value = val; cell.font = globalFont;
                     cell.alignment = { vertical: 'middle', horizontal: columnsSetup.alignments[colIdx] || 'left', wrapText: true };
                 });
 
                 for (const pf of photoFields) {
-                    const key = `${r.id}_${pf.field}`;
+                    const key   = `${r.id}_${pf.field}`;
                     const asset = activePhotoMap[key];
-                    const cell = wsRow.getCell(pf.col);
+                    const cell  = wsRow.getCell(pf.col);
 
                     if (asset && asset.buffer) {
                         try {
-                            const ext = (asset.fileName || '').toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
-                            const imgId = workbook.addImage({ buffer: asset.buffer, extension: ext });
-
-                            // FIX: Hapus colOff/rowOff — nilai EMU kecil/negatif menyebabkan
-                            // gambar tidak ter-render di Excel/Google Sheets.
+                            // Buffer sudah pasti JPEG hasil konversi sharp
+                            const imgId = workbook.addImage({ buffer: asset.buffer, extension: 'jpeg' });
                             ws.addImage(imgId, {
                                 tl: { col: pf.col - 1, row: curRow - 1 },
                                 br: { col: pf.col,     row: curRow     },
                                 editAs: 'oneCell'
                             });
                             cell.value = '';
-
                         } catch (e) {
-                            console.error(`[FAMIKA] Gagal memasukkan gambar ke sel:`, e.message);
+                            console.error(`[FAMIKA] Gagal insert gambar ke sel:`, e.message);
                             cell.value = 'Foto Gagal';
                             cell.font  = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
                         }
                     } else {
-                        // Periksa apakah data foto tersebut memang ada di DB namun gagal download, atau memang kosong
                         const hasAssetInDb = (photoMap[r.id] || []).some(a => {
                             const stored = (a.photo_kind || '').toLowerCase().replace(/^(photo_|foto_)/, '');
-                            const target = (pf.field || '').toLowerCase().replace(/^(photo_|foto_)/, '');
+                            const target = (pf.field    || '').toLowerCase().replace(/^(photo_|foto_)/, '');
                             return stored === target;
                         });
                         cell.value = hasAssetInDb ? 'Foto Gagal' : 'Tidak Ada';
@@ -401,17 +385,13 @@ app.get('/api/report/export', async (req, res) => {
                 }
                 curRow++;
             }
-
             applyBordersToRange(ws, 1, 5, columnsSetup.widths.length, curRow - 1);
         }
 
-        // ── SHEET 1: ODC ──────────────────────────────────────────────────────────
+        // ── SHEET 1: ODC ──────────────────────────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODC',
-            columnsSetup: {
-                widths:     [6, 12, 18, 10, 15, 24, 24, 24, 24, 24, 12],
-                alignments: ['center','center','center','center','center','center','center','center','center','center','center']
-            },
+            columnsSetup: { widths: [6,12,18,10,15,24,24,24,24,24,12], alignments: ['center','center','center','center','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','ODC','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','BUKA','TUTUP','BUKA','TUTUP','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:G5','H5:I5','J5:K5'],
@@ -428,22 +408,16 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 2: ODP ──────────────────────────────────────────────────────────
+        // ── SHEET 2: ODP ──────────────────────────────────────────────────────
         await buildReportSheet({
             sheetName: 'ODP',
-            columnsSetup: {
-                widths:     [6, 12, 18, 18, 12, 10, 15, 24, 24, 24, 24, 24, 12],
-                alignments: ['center','center','center','center','center','center','center','center','center','center','center','center','center']
-            },
+            columnsSetup: { widths: [6,12,18,18,12,10,15,24,24,24,24,24,12], alignments: ['center','center','center','center','center','center','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','ODC','ODP','SISA PORT','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','','','TUTUP','BUKA','TUTUP','BUKA','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:I5','J5:K5','L5:M5'],
             rowsData: (pmOdp || []).map((item, idx) => ({
                 id: item.id,
-                data: [idx+1, item.tanggal,
-                    odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A',
-                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
-                    item.sisa_port, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
+                data: [idx+1, item.tanggal, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A', odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A', item.sisa_port, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
             })),
             photoFields: [
                 { field: 'before_tutup', col: 8 },
@@ -454,11 +428,8 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 3: CLOSURE ──────────────────────────────────────────────────────
-        const closureCfg = {
-            widths:     [6, 12, 18, 12, 15, 24, 24, 24],
-            alignments: ['center','center','center','center','left','center','center','center']
-        };
+        // ── SHEET 3: CLOSURE ──────────────────────────────────────────────────
+        const closureCfg = { widths: [6,12,18,12,15,24,24,24], alignments: ['center','center','center','center','left','center','center','center'] };
         await buildReportSheet({
             sheetName: 'CLOSURE',
             columnsSetup: closureCfg,
@@ -469,12 +440,10 @@ app.get('/api/report/export', async (req, res) => {
                 id: item.id,
                 data: [idx+1, item.tanggal, closureMaster?.find(o => o.id === item.closure_id)?.closure_code || 'N/A', item.kondisi, item.kegiatan, '','','']
             })),
-            photoFields: [
-                { field: 'foto_closure', col: 6 }
-            ]
+            photoFields: [{ field: 'foto_closure', col: 6 }]
         });
 
-        // ── SHEET 4: KABEL (SPAN) ─────────────────────────────────────────────────
+        // ── SHEET 4: KABEL (SPAN) ─────────────────────────────────────────────
         await buildReportSheet({
             sheetName: 'KABEL',
             columnsSetup: closureCfg,
@@ -485,30 +454,20 @@ app.get('/api/report/export', async (req, res) => {
                 id: item.id,
                 data: [idx+1, item.tanggal, spanMaster?.find(o => o.id === item.span_id)?.span_code || 'N/A', item.kondisi, item.kegiatan, '','','']
             })),
-            photoFields: [
-                { field: 'foto_span', col: 6 }
-            ]
+            photoFields: [{ field: 'foto_span', col: 6 }]
         });
 
-        // ── SHEET 5: CUSTOMER (GANGGUAN) ──────────────────────────────────────────
+        // ── SHEET 5: CUSTOMER (GANGGUAN) ──────────────────────────────────────
         await buildReportSheet({
             sheetName: 'CUSTOMER',
             isCorrective: true,
-            columnsSetup: {
-                widths:     [6, 12, 18, 12, 15, 15, 8, 20, 15, 16, 16, 24, 24, 10, 10],
-                alignments: ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center']
-            },
+            columnsSetup: { widths: [6,12,18,12,15,15,8,20,15,16,16,24,24,10,10], alignments: ['center','center','left','center','center','center','center','left','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','DATE','NAMA','ID','ODC','ODP','PORT','ACTION','MATERIAL','SN ONT','','BEFORE','AFTER','JAM',''],
             headers_r6: ['','','','','','','','','','NEW','OLD','','','MULAI','SELESAI'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:K5','L5:L6','M5:M6','N5:O5'],
             rowsData: (corrective || []).map((item, idx) => ({
                 id: item.id,
-                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
-                    odcMaster?.find(o => o.id === item.odc_id)?.odc_code || '-',
-                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || '-',
-                    item.port_no || '-', item.action, item.material || '-',
-                    item.sn_ont_new || '-', item.sn_ont_old || '-',
-                    '','', item.jam_mulai || '-', item.jam_selesai || '-']
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || '-', odpMaster?.find(o => o.id === item.odp_id)?.odp_code || '-', item.port_no || '-', item.action, item.material || '-', item.sn_ont_new || '-', item.sn_ont_old || '-', '','', item.jam_mulai || '-', item.jam_selesai || '-']
             })),
             photoFields: [
                 { field: 'foto_before', col: 12 },
@@ -516,23 +475,16 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 6: DISMANTLING ──────────────────────────────────────────────────
+        // ── SHEET 6: DISMANTLING ──────────────────────────────────────────────
         await buildReportSheet({
             sheetName: 'DISMANTLING',
-            columnsSetup: {
-                widths:     [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24],
-                alignments: ['center','center','left','center','center','center','center','center','left','center','center']
-            },
+            columnsSetup: { widths: [6,12,18,12,12,8,16,15,20,24,24], alignments: ['center','center','left','center','center','center','center','center','left','center','center'] },
             headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO SERIALNUMBER','FOTO RUMAH'],
             headers_r6: ['','','','','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6'],
             rowsData: (dismantling || []).map((item, idx) => ({
                 id: item.id,
-                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
-                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
-                    item.port_no || '-', item.sn_ont || '-',
-                    item.no_hp || '-', item.alamat || '-',
-                    '','']
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id, odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A', item.port_no || '-', item.sn_ont || '-', item.no_hp || '-', item.alamat || '-', '','']
             })),
             photoFields: [
                 { field: 'foto_sn_ont', col: 10 },
@@ -540,23 +492,16 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // ── SHEET 7: AKTIVASI (PSB) ───────────────────────────────────────────────
+        // ── SHEET 7: AKTIVASI (PSB) ───────────────────────────────────────────
         await buildReportSheet({
             sheetName: 'AKTIVASI',
-            columnsSetup: {
-                widths:     [6, 12, 18, 12, 12, 8, 16, 15, 20, 24, 24, 24, 24, 24, 24, 24],
-                alignments: ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center']
-            },
+            columnsSetup: { widths: [6,12,18,12,12,8,16,15,20,24,24,24,24,24,24,24], alignments: ['center','center','left','center','center','center','center','center','left','center','center','center','center','center','center','center'] },
             headers_r5: ['NO','TANGGAL','NAMA PELANGGAN','ID PELANGGAN','ODP','PORT','SN ONT','NO HP','ALAMAT','FOTO ODP','PORT ODP','REDAM ODP','REDAM ONT','FOTO SN','FOTO RUMAH','SPEEDTEST'],
             headers_r6: ['','','','','','','','','','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6','I5:I6','J5:J6','K5:K6','L5:L6','M5:M6','N5:N6','O5:O6','P5:P6'],
             rowsData: (psb || []).map((item, idx) => ({
                 id: item.id,
-                data: [idx+1, item.tanggal, item.customer_name, item.service_id,
-                    odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
-                    item.port_no, item.sn_ont,
-                    item.no_hp || '-', item.alamat || '-',
-                    '','','','','','','']
+                data: [idx+1, item.tanggal, item.customer_name, item.service_id, odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A', item.port_no, item.sn_ont, item.no_hp || '-', item.alamat || '-', '','','','','','','']
             })),
             photoFields: [
                 { field: 'foto_odp',          col: 10 },
@@ -569,11 +514,9 @@ app.get('/api/report/export', async (req, res) => {
             ]
         });
 
-        // 6. Kirim file sebagai unduhan biner .xlsx ke browser admin
         const formattedFileName = `Laporan_Bulanan_${project.project_name.replace(/\s+/g, '_')}.xlsx`;
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${formattedFileName}"`);
-
         await workbook.xlsx.write(res);
         res.end();
 
