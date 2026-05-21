@@ -155,10 +155,7 @@ async function getSpanId(kodeSpan, siteId) {
 
 // --- FUNGSI UTAMA KOMPRESI DAN UNGGAH KE STORAGE BUCKET ---
 async function compressAndUpload(fileBuffer, fieldName, taskType, projectId) {
-    const folderName = taskType.replace('form_', '');
     const fileName = `${fieldName}-${Date.now()}.jpg`;
-    // Path diseragamkan dengan format yang dipakai index.html:
-    // {taskType}/{projectId}/{fileName}
     const fullPath = `${taskType}/${projectId}/${fileName}`;
 
     const compressedBuffer = await sharp(fileBuffer)
@@ -167,7 +164,7 @@ async function compressAndUpload(fileBuffer, fieldName, taskType, projectId) {
         .toBuffer();
 
     const { error } = await supabase.storage
-        .from(STORAGE_BUCKET)           // ← gunakan konstanta
+        .from(STORAGE_BUCKET)
         .upload(fullPath, compressedBuffer, {
             contentType: 'image/jpeg',
             upsert: true
@@ -391,7 +388,15 @@ app.get('/api/report/export', async (req, res) => {
         ]);
 
         // 3. Tarik Seluruh Tabel Transaksi Pekerjaan untuk Project_id Terkait
-        const [{ data: pmOdc }, { data: pmOdp }, { data: pmClosure }, { data: pmSpan }, { data: corrective }, { data: dismantling }, { data: psb }] = await Promise.all([
+        const [
+            { data: pmOdc },
+            { data: pmOdp },
+            { data: pmClosure },
+            { data: pmSpan },
+            { data: corrective },
+            { data: dismantling },
+            { data: psb }
+        ] = await Promise.all([
             supabase.from('pm_odc').select('*').eq('period_id', project_id),
             supabase.from('pm_odp').select('*').eq('period_id', project_id),
             supabase.from('pm_closure').select('*').eq('period_id', project_id),
@@ -401,16 +406,32 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('psb_records').select('*').eq('period_id', project_id)
         ]);
 
-        // 4. Tarik Log Semua Media Foto lalu buat map record_id → [assets]
-        const { data: photos } = await supabase
-            .from('photo_assets')
-            .select('*');
+        // 4. Kumpulkan semua record_id dari project ini lalu tarik photo_assets secara spesifik
+        //    FIX: dulu query tanpa filter → sekarang filter hanya record milik project ini
+        const allRecordIds = [
+            ...(pmOdc        || []).map(r => r.id),
+            ...(pmOdp        || []).map(r => r.id),
+            ...(pmClosure    || []).map(r => r.id),
+            ...(pmSpan       || []).map(r => r.id),
+            ...(corrective   || []).map(r => r.id),
+            ...(dismantling  || []).map(r => r.id),
+            ...(psb          || []).map(r => r.id),
+        ];
+
         const photoMap = {};
-        if (photos) {
-            photos.forEach(p => {
-                if (!photoMap[p.record_id]) photoMap[p.record_id] = [];
-                photoMap[p.record_id].push(p);
-            });
+        if (allRecordIds.length > 0) {
+            // Supabase in() filter — fetch semua foto milik records project ini saja
+            const { data: photos, error: photoErr } = await supabase
+                .from('photo_assets')
+                .select('record_id, photo_kind, file_path, file_name, module_name')
+                .in('record_id', allRecordIds);
+
+            if (!photoErr && photos) {
+                photos.forEach(p => {
+                    if (!photoMap[p.record_id]) photoMap[p.record_id] = [];
+                    photoMap[p.record_id].push(p);
+                });
+            }
         }
 
         // 5. Inisialisasi Excel Workbook
@@ -493,32 +514,51 @@ app.get('/api/report/export', async (req, res) => {
 
                 for (const pf of photoFields) {
                     const assets = photoMap[r.id] || [];
-                    // photo_kind di DB diseragamkan: tanpa prefix 'photo_'
-                    const asset = assets.find(a => a.photo_kind === pf.field);
-                    const cell  = wsRow.getCell(pf.col);
+
+                    // FIX: normalisasi photo_kind — strip prefix 'photo_' jika ada
+                    // index.html menyimpan: 'before_tutup', 'foto_opm', dst (tanpa prefix)
+                    // Pastikan matching case-insensitive dan toleran terhadap variasi
+                    const asset = assets.find(a => {
+                        const stored = (a.photo_kind || '').toLowerCase().replace(/^photo_/, '');
+                        const target = (pf.field || '').toLowerCase().replace(/^photo_/, '');
+                        return stored === target;
+                    });
+
+                    const cell = wsRow.getCell(pf.col);
                     cell.alignment = { vertical: 'middle', horizontal: 'center' };
 
                     if (asset) {
                         try {
-                            const { data: fileData, error: dlErr } = await supabase.storage
-                                .from(STORAGE_BUCKET)       // ← pakai konstanta
-                                .download(asset.file_path);
+                            // FIX: gunakan signed URL untuk download agar tidak gagal karena akses bucket
+                            const { data: signedData, error: signErr } = await supabase.storage
+                                .from(STORAGE_BUCKET)
+                                .createSignedUrl(asset.file_path, 60); // valid 60 detik
 
-                            if (!dlErr && fileData) {
-                                const buffer = Buffer.from(await fileData.arrayBuffer());
-                                const imgId  = workbook.addImage({ buffer, extension: 'jpeg' });
-                                ws.addImage(imgId, {
-                                    tl: { col: pf.col - 1, row: curRow - 1, colOff: 6, rowOff: 6 },
-                                    br: { col: pf.col,     row: curRow,     colOff: -6, rowOff: -6 },
-                                    editAs: 'oneCell'
-                                });
-                                cell.value = '';
-                            } else {
-                                cell.value = 'Foto Gagal';
-                                cell.font  = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
+                            if (signErr || !signedData?.signedUrl) {
+                                throw new Error(`Signed URL gagal: ${signErr?.message}`);
                             }
+
+                            // Download via signed URL
+                            const fetchRes = await fetch(signedData.signedUrl);
+                            if (!fetchRes.ok) throw new Error(`Download foto gagal: HTTP ${fetchRes.status}`);
+
+                            const arrayBuffer = await fetchRes.arrayBuffer();
+                            const buffer = Buffer.from(arrayBuffer);
+
+                            // Deteksi ekstensi dari file_path / file_name
+                            const ext = (asset.file_name || asset.file_path || '').toLowerCase().endsWith('.png') ? 'png' : 'jpeg';
+                            const imgId = workbook.addImage({ buffer, extension: ext });
+
+                            ws.addImage(imgId, {
+                                tl: { col: pf.col - 1, row: curRow - 1, colOff: 6, rowOff: 6 },
+                                br: { col: pf.col,     row: curRow,     colOff: -6, rowOff: -6 },
+                                editAs: 'oneCell'
+                            });
+                            cell.value = '';
+
                         } catch (e) {
-                            cell.value = 'Eror Foto';
+                            console.error(`Gagal embed foto [${pf.field}] record ${r.id}:`, e.message);
+                            cell.value = 'Foto Gagal';
                             cell.font  = { name: 'Arial', size: 8, color: { argb: 'EF4444' } };
                         }
                     } else {
@@ -546,7 +586,6 @@ app.get('/api/report/export', async (req, res) => {
                 id: item.id,
                 data: [idx+1, item.tanggal, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A', item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
             })),
-            // photo_kind dikirim index.html: 'before_buka', 'before_tutup', 'after_buka', 'after_tutup', 'foto_opm'
             photoFields: [
                 { field: 'before_buka',  col: 6 },
                 { field: 'before_tutup', col: 7 },
@@ -660,8 +699,7 @@ app.get('/api/report/export', async (req, res) => {
                     odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
                     item.port_no || '-', item.sn_ont || '-',
                     item.no_hp || '-', item.alamat || '-',
-                    '',''
-                ]
+                    '','']
             })),
             photoFields: [
                 { field: 'foto_sn_ont', col: 10 },
@@ -685,8 +723,7 @@ app.get('/api/report/export', async (req, res) => {
                     odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A',
                     item.port_no, item.sn_ont,
                     item.no_hp || '-', item.alamat || '-',
-                    '','','','','','',''
-                ]
+                    '','','','','','','']
             })),
             photoFields: [
                 { field: 'foto_odp',          col: 10 },
