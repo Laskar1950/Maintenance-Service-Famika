@@ -173,7 +173,17 @@
             <div class="grid grid-cols-4 gap-2" id="report-summary-grid"></div>
         </div>
 
-        <!-- Tombol Download -->
+        <!-- Tombol Preview Foto -->
+        <button id="btn-preview-foto" onclick="doPreviewFoto()" disabled
+            class="w-full bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-extrabold py-3.5 px-4 rounded-2xl text-xs transition-all flex items-center justify-center gap-2 border border-slate-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            <span>Preview Foto Sebelum Download</span>
+        </button>
+
+        <!-- Tombol Download Excel -->
         <button id="btn-generate-report" onclick="doGenerateReport()" disabled
             class="w-full bg-violet-600 hover:bg-violet-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-extrabold py-4 px-4 rounded-2xl text-sm transition-all flex items-center justify-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
@@ -183,7 +193,7 @@
         </button>
 
         <p class="text-center text-[10px] text-slate-400 leading-relaxed px-2">
-            File .xlsx akan otomatis diunduh atau dibuka oleh browser. Proses generate bisa memakan waktu 10&ndash;30 detik tergantung jumlah data &amp; foto.
+            File .xlsx akan dibuka di browser bawaan Telegram. Proses generate bisa memakan waktu 10&ndash;30 detik tergantung jumlah data &amp; foto.
         </p>
     </div>
 
@@ -223,7 +233,7 @@
 <!-- MODAL ERROR -->
 <div id="error-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5 hidden">
     <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-        <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div class="w-16 h-16 bg-rose-50 bg-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </div>
         <h4 class="text-lg font-black text-slate-900">Pengiriman Gagal</h4>
@@ -237,7 +247,6 @@ const SUPABASE_URL       = 'https://bwfbntebndkbglmbziij.supabase.co';
 const SUPABASE_URL_REST  = `${SUPABASE_URL}/rest/v1`;
 const SUPABASE_ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ3ZmJudGVibmRrYmdsbWJ6aWlqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwOTM5OTgsImV4cCI6MjA5NDY2OTk5OH0.GBexESObualCsGswmEUsreO-jXlEpppB5cLmIW99mvU';
 const STORAGE_BUCKET     = 'laporan-foto';
-// Sesuaikan dengan URL Vercel / server yang berjalan
 const SERVER_BASE_URL    = 'https://maintenance-service-famika.vercel.app';
 
 let currentActiveTask = 'home';
@@ -246,7 +255,7 @@ let activeProjectId   = localStorage.getItem('famika_active_project_id')   || ''
 let activeProjectName = localStorage.getItem('famika_active_project_name') || '';
 let activeSiteId      = localStorage.getItem('famika_active_site_id')      || '';
 let technicianUserId  = null;
-let isAdmin           = false; // akan diset setelah cek role
+let isAdmin           = false;
 
 const tg = window.Telegram?.WebApp;
 let technicianUsername = 'Teknisi Lapangan';
@@ -257,13 +266,8 @@ if (tg) {
 }
 document.getElementById('tech-username').innerText = technicianUsername;
 
-// ============================================================
-// CEK ROLE ADMIN — dipanggil sekali saat load
-// Query ke tabel users by full_name atau username
-// ============================================================
 async function checkAdminRole() {
     try {
-        // Coba match dengan full_name dulu, lalu fallback ke telegram username
         const query = `users?or=(full_name.ilike.${encodeURIComponent('%'+technicianUsername+'%')})&select=id,role&limit=1`;
         const data  = await sb(query);
         if (data?.[0]) {
@@ -273,7 +277,6 @@ async function checkAdminRole() {
     } catch (e) {
         console.warn('Gagal cek role admin:', e.message);
     }
-    // Tampilkan/sembunyikan menu Generate Report
     const menuCard = document.getElementById('menu-generate-report');
     if (menuCard) {
         isAdmin ? menuCard.classList.remove('hidden') : menuCard.classList.add('hidden');
@@ -281,8 +284,16 @@ async function checkAdminRole() {
 }
 
 // ============================================================
-// HELPER: buat field input/select/textarea
+// HELPER BUKA URL — pakai Telegram.WebApp.openLink jika tersedia
 // ============================================================
+function openUrl(url) {
+    if (tg && typeof tg.openLink === 'function') {
+        tg.openLink(url);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
 function fInput(id, label, placeholder='', required=true, type='text') {
     const req = required ? '<span class="text-rose-400">*</span>' : '<span class="text-slate-300 text-[9px]">(opsional)</span>';
     return `<div><label class="block text-[10px] font-bold text-slate-500 mb-1">${label} ${req}</label>
@@ -317,9 +328,6 @@ function fCard(...innerHtml) {
     return `<div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-3">${innerHtml.join('')}</div>`;
 }
 
-// ============================================================
-// DEFINISI FORM
-// ============================================================
 const FORM_DEFINITIONS = {
     form_odc: {
         title: 'Form PM ODC',
@@ -449,9 +457,6 @@ const FORM_DEFINITIONS = {
     }
 };
 
-// ============================================================
-// NAVIGASI VIEW
-// ============================================================
 function showView(viewName) {
     currentActiveTask = viewName;
     document.getElementById('view-project-setup').classList.add('hidden');
@@ -517,15 +522,11 @@ function showView(viewName) {
     window.scrollTo(0, 0);
 }
 
-// ============================================================
-// GENERATE REPORT — LOGIKA
-// ============================================================
 async function loadAllProjectsForReport() {
     const sel = document.getElementById('report_project_select');
     if (!sel) return;
     sel.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat...</option>';
     try {
-        // Ambil semua project (aktif maupun sudah selesai)
         const projects = await sb('projects?select=id,project_name,site_code,bulan,tahun,status&order=created_at.desc');
         if (!projects || projects.length === 0) {
             sel.innerHTML = '<option value="" disabled selected>Belum ada project tersimpan.</option>';
@@ -548,17 +549,18 @@ async function onReportProjectChange() {
     const projectId = sel.value;
     if (!projectId) return;
 
-    const summaryCard = document.getElementById('report-summary-card');
-    const summaryGrid = document.getElementById('report-summary-grid');
-    const btnGenerate = document.getElementById('btn-generate-report');
-    const btnText     = document.getElementById('btn-generate-text');
+    const summaryCard   = document.getElementById('report-summary-card');
+    const summaryGrid   = document.getElementById('report-summary-grid');
+    const btnGenerate   = document.getElementById('btn-generate-report');
+    const btnPreview    = document.getElementById('btn-preview-foto');
+    const btnText       = document.getElementById('btn-generate-text');
 
     summaryCard.classList.add('hidden');
     btnGenerate.disabled = true;
+    btnPreview.disabled  = true;
     btnText.innerText    = 'Memuat ringkasan...';
 
     try {
-        // Hitung jumlah data per modul secara paralel
         const [odc, odp, closure, span, gangguan, dismantling, psb] = await Promise.all([
             sb(`pm_odc?period_id=eq.${projectId}&select=id`),
             sb(`pm_odp?period_id=eq.${projectId}&select=id`),
@@ -590,6 +592,7 @@ async function onReportProjectChange() {
 
         summaryCard.classList.remove('hidden');
         btnGenerate.disabled = false;
+        btnPreview.disabled  = false;
         btnText.innerText    = totalData === 0
             ? 'Download Excel (Kosong)'
             : `Download Excel (${totalData} data)`;
@@ -597,22 +600,28 @@ async function onReportProjectChange() {
     } catch (err) {
         btnText.innerText    = 'Gagal memuat ringkasan';
         btnGenerate.disabled = true;
+        btnPreview.disabled  = true;
     }
 }
 
+// Buka halaman preview foto
+function doPreviewFoto() {
+    const sel       = document.getElementById('report_project_select');
+    const projectId = sel.value;
+    if (!projectId) { showErrorModal('Pilih project terlebih dahulu.'); return; }
+    const url = `${SERVER_BASE_URL}/api/report/preview?project_id=${projectId}`;
+    openUrl(url);
+}
+
+// Download Excel — pakai Telegram.WebApp.openLink agar tidak diblokir
 function doGenerateReport() {
     const sel       = document.getElementById('report_project_select');
     const projectId = sel.value;
     if (!projectId) { showErrorModal('Pilih project terlebih dahulu.'); return; }
-
     const url = `${SERVER_BASE_URL}/api/report/export?project_id=${projectId}`;
-    // Buka di tab baru agar tidak keluar dari Mini App
-    window.open(url, '_blank');
+    openUrl(url);
 }
 
-// ============================================================
-// HANDLER FOTO
-// ============================================================
 function handlePhotoSelect(event, index) {
     const file = event.target.files[0];
     if (!file) return;
@@ -638,9 +647,6 @@ function handlePhotoSelect(event, index) {
     reader.readAsDataURL(file);
 }
 
-// ============================================================
-// SUBMIT FORM
-// ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
     const def = FORM_DEFINITIONS[currentActiveTask];
@@ -731,9 +737,6 @@ function closeErrorModal() {
     document.getElementById('error-modal').classList.add('hidden');
 }
 
-// ============================================================
-// SUPABASE HELPERS
-// ============================================================
 async function sb(endpoint) {
     const res = await fetch(`${SUPABASE_URL_REST}/${endpoint}`, {
         headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
@@ -752,9 +755,6 @@ async function sbPost(table, body) {
     return data;
 }
 
-// ============================================================
-// PROJECT MANAGEMENT
-// ============================================================
 function checkProjectLifecycle() {
     if (!activeProjectId) {
         document.getElementById('view-project-setup').classList.remove('hidden');
@@ -851,9 +851,6 @@ function clearActiveProject() {
     checkProjectLifecycle();
 }
 
-// ============================================================
-// DROPDOWN LOADERS
-// ============================================================
 async function syncAndRenderOdcDropdown() {
     const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
@@ -917,7 +914,7 @@ async function loadAllSpans() {
 }
 
 window.onload = function () {
-    checkAdminRole();      // cek role admin terlebih dahulu
+    checkAdminRole();
     checkProjectLifecycle();
 };
 </script>
