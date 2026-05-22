@@ -858,19 +858,43 @@ async function syncAndRenderOdcDropdown() {
     try {
         const allOdc = await sb(`odc_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_code&order=odc_code`);
         let usedOdcIds = new Set();
+
         if (currentActiveTask === 'form_odc' && activeProjectId) {
+            // form ODC: filter ODC yang sudah diinput
             try { const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`); used.forEach(r => usedOdcIds.add(r.odc_id)); } catch {}
+        } else if (currentActiveTask === 'form_odp' && activeProjectId) {
+            // form ODP: filter ODC yang semua ODP-nya sudah diinput di project ini
+            try {
+                // Ambil semua ODP master per ODC dan semua ODP yang sudah diinput
+                const [allOdpMaster, usedOdp] = await Promise.all([
+                    sb(`odp_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_id`),
+                    sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`)
+                ]);
+                const usedOdpIds = new Set(usedOdp.map(r => r.odp_id));
+                // Tandai ODC sebagai "selesai" jika seluruh ODP miliknya sudah diinput
+                allOdc.forEach(odc => {
+                    const odpsOfThisOdc = allOdpMaster.filter(o => o.odc_id === odc.id);
+                    if (odpsOfThisOdc.length > 0 && odpsOfThisOdc.every(o => usedOdpIds.has(o.id))) {
+                        usedOdcIds.add(odc.id);
+                    }
+                });
+            } catch {}
         }
+
         const isRequired = odcSelect.hasAttribute('required');
         const firstOpt   = isRequired ? '<option value="" disabled selected>Pilih Kode ODC</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
         const available  = allOdc.filter(o => !usedOdcIds.has(o.id));
+
         if (currentActiveTask === 'form_odc' && available.length === 0) {
             odcSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODC sudah diinput</option>';
+        } else if (currentActiveTask === 'form_odp' && available.length === 0) {
+            odcSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODP sudah diinput</option>';
         } else {
             odcSelect.innerHTML = firstOpt + available.map(o => `<option value="${o.id}">${o.odc_code}</option>`).join('');
         }
     } catch { odcSelect.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat</option>'; }
 }
+
 async function fetchOdpsForSelectedOdc() {
     const odcSelect = document.getElementById('odc_id');
     const odpSelect = document.getElementById('odp_id');
