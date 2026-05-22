@@ -377,7 +377,7 @@ const FORM_DEFINITIONS = {
     },
     form_span: {
         title: 'Form Span Kabel',
-        subtitle: 'Pemeriksaan Fisik Bentangan & Spare Kabel',
+        subtitle: 'Pemeriksaan Fisik Bentangan &amp; Spare Kabel',
         table: 'pm_span',
         photoKinds: ['foto_span'],
         photoLabels: ['Foto Span Kabel'],
@@ -415,7 +415,7 @@ const FORM_DEFINITIONS = {
     },
     form_dismantling: {
         title: 'Form Dismantling (Cabut)',
-        subtitle: 'Pencabutan Material & Dropcore Pelanggan',
+        subtitle: 'Pencabutan Material &amp; Dropcore Pelanggan',
         table: 'dismantling_records',
         photoKinds: ['foto_sn_ont','foto_rumah'],
         photoLabels: ['Foto Serial Number ONT','Foto Rumah Pelanggan'],
@@ -435,7 +435,7 @@ const FORM_DEFINITIONS = {
     },
     form_psb: {
         title: 'Form Aktivasi Baru (PSB)',
-        subtitle: 'Pemasangan & Uji Redaman Pelanggan Baru',
+        subtitle: 'Pemasangan &amp; Uji Redaman Pelanggan Baru',
         table: 'psb_records',
         photoKinds: ['foto_odp','foto_port_odp','foto_redaman_odp','foto_redaman_akhir','foto_sn_ont','foto_instalasi','foto_speedtest'],
         photoLabels: ['Foto ODP','Foto Port ODP','Foto Redaman ODP','Foto Redaman Akhir','Foto Serial Number ONT','Foto Instalasi Rumah','Foto Speedtest'],
@@ -865,20 +865,26 @@ async function syncAndRenderOdcDropdown() {
         } else if (currentActiveTask === 'form_odp' && activeProjectId) {
             // form ODP: filter ODC yang semua ODP-nya sudah diinput di project ini
             try {
-                // Ambil semua ODP master per ODC dan semua ODP yang sudah diinput
-                const [allOdpMaster, usedOdp] = await Promise.all([
-                    sb(`odp_master?site_id=eq.${activeSiteId}&is_active=eq.true&select=id,odc_id`),
-                    sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`)
-                ]);
-                const usedOdpIds = new Set(usedOdp.map(r => r.odp_id));
-                // Tandai ODC sebagai "selesai" jika seluruh ODP miliknya sudah diinput
-                allOdc.forEach(odc => {
-                    const odpsOfThisOdc = allOdpMaster.filter(o => o.odc_id === odc.id);
-                    if (odpsOfThisOdc.length > 0 && odpsOfThisOdc.every(o => usedOdpIds.has(o.id))) {
-                        usedOdcIds.add(odc.id);
-                    }
-                });
-            } catch {}
+                if (allOdc.length > 0) {
+                    const odcIdsStr = allOdc.map(o => o.id).join(',');
+                    // AMBIL SEMUA ODP MASTER YANG HANYA BERELASI DENGAN ODC DI WILAYAH INI (MENGHINDARI MISMATCH SITE_ID)
+                    const [allOdpMaster, usedOdp] = await Promise.all([
+                        sb(`odp_master?odc_id=in.(${odcIdsStr})&is_active=eq.true&select=id,odc_id`),
+                        sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`)
+                    ]);
+                    const usedOdpIds = new Set(usedOdp.map(r => r.odp_id));
+                    
+                    // Tandai ODC sebagai "selesai" jika seluruh ODP miliknya sudah diinput di period_id project aktif ini
+                    allOdc.forEach(odc => {
+                        const odpsOfThisOdc = allOdpMaster.filter(o => o.odc_id === odc.id);
+                        if (odpsOfThisOdc.length > 0 && odpsOfThisOdc.every(o => usedOdpIds.has(o.id))) {
+                            usedOdcIds.add(odc.id);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Error filtering ODC by completed ODPs:", err);
+            }
         }
 
         const isRequired = odcSelect.hasAttribute('required');
