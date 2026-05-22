@@ -17,7 +17,7 @@
 <header class="bg-white border-b border-slate-200/80 px-5 py-4 sticky top-0 z-30 shrink-0 shadow-sm">
     <div class="flex items-center justify-between max-w-md mx-auto">
         <div class="flex items-center gap-3">
-            <div id="btn-back-home" onclick="showView('home')" class="bg-slate-100 text-slate-600 p-2 rounded-xl cursor-pointer hover:bg-slate-200 transition-all hidden">
+            <div id="btn-back-home" onclick="handleBackButton()" class="bg-slate-100 text-slate-600 p-2 rounded-xl cursor-pointer hover:bg-slate-200 transition-all hidden">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
             </div>
             <div id="header-logo-container" class="bg-sky-600 text-white p-2 rounded-xl shadow-sm">
@@ -149,6 +149,20 @@
         </div>
     </div>
 
+    <!-- VIEW: DAFTAR RIWAYAT PEKERJAAN (CRUD LIST VIEW) -->
+    <div id="view-history-list" class="space-y-4 hidden">
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/80 flex justify-between items-center shadow-xs">
+            <div>
+                <h2 id="history-title" class="text-sm font-black text-slate-900 uppercase">Riwayat Laporan</h2>
+                <p id="history-subtitle" class="text-[10px] text-slate-400 mt-1 font-semibold">Daftar berkas terkirim di project ini</p>
+            </div>
+            <button onclick="switchFormToCreate()" class="bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs py-2.5 px-4 rounded-xl shadow-xs transition-all uppercase tracking-wider">+ Tambah</button>
+        </div>
+        <div id="history-cards-container" class="space-y-2.5">
+            <!-- Kartu riwayat akan dirender secara dinamis lewat JS -->
+        </div>
+    </div>
+
     <!-- VIEW: GENERATE REPORT (ADMIN) -->
     <div id="view-generate-report" class="space-y-4 hidden">
         <div class="bg-white rounded-2xl p-5 border border-slate-200/80">
@@ -197,10 +211,10 @@
         </p>
     </div>
 
-    <!-- VIEW: FORM CONTAINER -->
+    <!-- VIEW: FORM CONTAINER (CREATE & EDIT MODES) -->
     <form id="pm-form" onsubmit="handleSubmit(event)" class="space-y-4 hidden">
         <div id="dynamic-form-fields"></div>
-        <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-4">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200/80 space-y-4 shadow-2xs">
             <div class="flex items-center gap-2 pb-2 border-b border-slate-100">
                 <span class="text-sky-600"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /></svg></span>
                 <h2 class="text-xs font-black text-slate-900 uppercase tracking-wider">Dokumentasi Foto Lapangan</h2>
@@ -218,6 +232,25 @@
 
 </main>
 
+<!-- MODAL DETAIL LAPORAN -->
+<div id="detail-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5 hidden">
+    <div class="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl overflow-y-auto max-h-[85vh] border border-slate-100 space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+            <h4 id="detail-modal-title" class="text-sm font-black text-slate-900 uppercase tracking-wider">Detail Laporan</h4>
+            <button onclick="closeDetailModal()" class="text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+        </div>
+        <div id="detail-modal-content" class="text-xs space-y-3">
+            <!-- Dynamic details will be loaded here -->
+        </div>
+        <div class="flex gap-3 pt-2">
+            <button id="btn-edit-record" onclick="switchToEditMode()" class="flex-1 bg-sky-600 hover:bg-sky-700 text-white font-extrabold text-xs py-3 px-4 rounded-xl transition-all uppercase tracking-wider shadow-xs shadow-sky-600/10">Edit Laporan</button>
+            <button onclick="closeDetailModal()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-3 px-4 rounded-xl transition-all uppercase tracking-wider">Tutup</button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL SUKSES -->
 <div id="success-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5 hidden">
     <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
@@ -233,7 +266,7 @@
 <!-- MODAL ERROR -->
 <div id="error-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-5 hidden">
     <div class="bg-white rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
-        <div class="w-16 h-16 bg-rose-50 bg-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
+        <div class="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
         </div>
         <h4 class="text-lg font-black text-slate-900">Pengiriman Gagal</h4>
@@ -249,8 +282,14 @@ const SUPABASE_ANON_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXB
 const STORAGE_BUCKET     = 'laporan-foto';
 const SERVER_BASE_URL    = 'https://maintenance-service-famika.vercel.app';
 
-let currentActiveTask = 'home';
-let compressedBlobs   = {};
+// CRUD STATE MANAGEMENT
+let currentActiveTask   = 'home';
+let currentTaskMode     = 'list'; // 'list', 'create', 'edit'
+let currentHistoryItems = [];
+let selectedRecordId    = null;
+let selectedRecordPhotos= [];
+let compressedBlobs     = {};
+
 let activeProjectId   = localStorage.getItem('famika_active_project_id')   || '';
 let activeProjectName = localStorage.getItem('famika_active_project_name') || '';
 let activeSiteId      = localStorage.getItem('famika_active_site_id')      || '';
@@ -383,7 +422,7 @@ const FORM_DEFINITIONS = {
         photoLabels: ['Foto Span Kabel'],
         fields: () => fCard(
             fSectionTitle('Data Span Kabel'),
-            fDynSelect('span_id','Kode Span','Memuat daftar Span...',false),
+            fDynSelect('span_id','Kode Span','Memuat daftar Span...',true),
             fInput('segment','Segment','Contoh: Seg-B',false),
             fInput('pembangunan','Pembangunan','Contoh: 2021',false),
             fSelect('kondisi_slack','Kondisi Slack',[{v:'BAIK',l:'Baik'},{v:'TIDAK BAIK',l:'Tidak Baik'}],true),
@@ -458,16 +497,19 @@ const FORM_DEFINITIONS = {
 };
 
 function showView(viewName) {
-    currentActiveTask = viewName;
+    const backBtn       = document.getElementById('btn-back-home');
+    const logoContainer = document.getElementById('header-logo-container');
+
+    // Reset task modes
     document.getElementById('view-project-setup').classList.add('hidden');
     document.getElementById('view-home').classList.add('hidden');
     document.getElementById('pm-form').classList.add('hidden');
     document.getElementById('view-generate-report').classList.add('hidden');
-
-    const backBtn       = document.getElementById('btn-back-home');
-    const logoContainer = document.getElementById('header-logo-container');
+    document.getElementById('view-history-list').classList.add('hidden');
 
     if (viewName === 'home') {
+        currentActiveTask = 'home';
+        currentTaskMode = 'list';
         document.getElementById('view-home').classList.remove('hidden');
         document.getElementById('dashboard-active-project-name').innerText = activeProjectName;
         backBtn.classList.add('hidden');
@@ -478,6 +520,8 @@ function showView(viewName) {
     }
 
     if (viewName === 'generate_report') {
+        currentActiveTask = 'generate_report';
+        currentTaskMode = 'list';
         if (!isAdmin) { showErrorModal('Akses ditolak. Hanya admin yang dapat mengakses fitur ini.'); return; }
         document.getElementById('view-generate-report').classList.remove('hidden');
         document.getElementById('header-title').innerText    = 'Generate Laporan';
@@ -488,16 +532,62 @@ function showView(viewName) {
         return;
     }
 
+    // Jika yang diklik adalah salah satu menu form pelaporan
     const def = FORM_DEFINITIONS[viewName];
     if (!def) return;
 
-    document.getElementById('header-title').innerText    = def.title;
-    document.getElementById('header-subtitle').innerText = def.subtitle;
+    currentActiveTask = viewName;
     backBtn.classList.remove('hidden');
     logoContainer.classList.add('hidden');
 
+    // Berdasarkan mode CRUD aktif (List View secara default)
+    if (currentTaskMode === 'list') {
+        document.getElementById('header-title').innerText    = def.title;
+        document.getElementById('header-subtitle').innerText = 'Daftar Riwayat ' + def.title;
+        document.getElementById('history-title').innerText    = 'Riwayat Laporan';
+        document.getElementById('history-subtitle').innerText = 'Daftar berkas terkirim di project ini';
+        document.getElementById('view-history-list').classList.remove('hidden');
+        fetchAndRenderHistoryList();
+    } else {
+        // Create atau Edit form renderer
+        renderCoreFormUI();
+    }
+
+    window.scrollTo(0, 0);
+}
+
+// Handler back button dinamis mengikuti alur mode CRUD
+function handleBackButton() {
+    if (currentActiveTask === 'home' || currentActiveTask === 'generate_report') {
+        showView('home');
+    } else {
+        if (currentTaskMode === 'create' || currentTaskMode === 'edit') {
+            currentTaskMode = 'list';
+            showView(currentActiveTask);
+        } else {
+            showView('home');
+        }
+    }
+}
+
+// Switch UI ke Form Create Baru
+function switchFormToCreate() {
+    currentTaskMode = 'create';
+    selectedRecordId = null;
+    renderCoreFormUI();
+}
+
+// Render Master Form UI
+function renderCoreFormUI() {
+    const def = FORM_DEFINITIONS[currentActiveTask];
+    if (!def) return;
+
+    document.getElementById('view-history-list').classList.add('hidden');
     document.getElementById('dynamic-form-fields').innerHTML = def.fields();
     compressedBlobs = {};
+
+    document.getElementById('header-title').innerText    = currentTaskMode === 'edit' ? 'Edit ' + def.title : 'Tambah ' + def.title;
+    document.getElementById('btn-text').innerText = currentTaskMode === 'edit' ? 'Simpan Perubahan' : 'Kirim Berkas Laporan';
 
     const photoContainer = document.getElementById('photo-boxes-container');
     photoContainer.innerHTML = def.photoLabels.map((label, i) => `
@@ -515,11 +605,294 @@ function showView(viewName) {
     document.getElementById('pm-form').classList.remove('hidden');
 
     const needsOdc = ['form_odc','form_odp','form_gangguan','form_dismantling','form_psb'];
-    if (needsOdc.includes(viewName)) syncAndRenderOdcDropdown();
-    if (viewName === 'form_closure') loadAllClosures();
-    if (viewName === 'form_span')    loadAllSpans();
+    if (needsOdc.includes(currentActiveTask)) syncAndRenderOdcDropdown();
+    if (currentActiveTask === 'form_closure') loadAllClosures();
+    if (currentActiveTask === 'form_span')    loadAllSpans();
+}
 
-    window.scrollTo(0, 0);
+// ============================================================
+// CRUD READ: AMBIL RIWAYAT LAPORAN DARI DATABASE DENGAN URUTAN PINTAR
+// Urutan: Tanggal terbaru di atas, lalu berdasarkan Kode Alfanumerik
+// ============================================================
+async function fetchAndRenderHistoryList() {
+    const container = document.getElementById('history-cards-container');
+    container.innerHTML = '<div class="text-center py-8 text-xs text-slate-400 font-semibold">&#x23F3; Memuat riwayat...</div>';
+
+    const def = FORM_DEFINITIONS[currentActiveTask];
+    try {
+        const items = await sb(`${def.table}?period_id=eq.${activeProjectId}&order=created_at.desc`);
+        currentHistoryItems = items || [];
+
+        if (currentHistoryItems.length === 0) {
+            container.innerHTML = `
+                <div class="bg-white rounded-2xl p-8 border border-slate-200/80 text-center space-y-2">
+                    <p class="text-xs font-bold text-slate-700">Belum Ada Riwayat Laporan</p>
+                    <p class="text-[10px] text-slate-400">Silakan klik tombol "+ Tambah" di atas untuk membuat laporan lapangan baru.</p>
+                </div>`;
+            return;
+        }
+
+        // Ambil lookup data master untuk menampilkan kode daripada ID UUID di list
+        const [odcs, odps, closures, spans] = await Promise.all([
+            sb('odc_master?select=id,odc_code'),
+            sb('odp_master?select=id,odp_code'),
+            sb('closure_master?select=id,closure_code'),
+            sb('span_master?select=id,span_code')
+        ]);
+
+        const odcMap = new Map(odcs.map(o => [o.id, o.odc_code]));
+        const odpMap = new Map(odps.map(o => [o.id, o.odp_code]));
+        const clsMap = new Map(closures.map(c => [c.id, c.closure_code]));
+        const spnMap = new Map(spans.map(s => [s.id, s.span_code]));
+
+        // 1. SINKRONISASI KODE DAN PENYEMATAN FIELD PENGURUTAN SEBELUM SORTING
+        const resolvedItems = currentHistoryItems.map(item => {
+            let code = '';
+            if (currentActiveTask === 'form_odc') {
+                code = odcMap.get(item.odc_id) || '';
+            } else if (currentActiveTask === 'form_odp') {
+                code = odpMap.get(item.odp_id) || '';
+            } else if (currentActiveTask === 'form_closure') {
+                code = clsMap.get(item.closure_id) || '';
+            } else if (currentActiveTask === 'form_span') {
+                code = spnMap.get(item.span_id) || '';
+            } else if (currentActiveTask === 'form_gangguan') {
+                code = item.customer_name || '';
+            } else if (currentActiveTask === 'form_dismantling') {
+                code = item.customer_name || '';
+            } else if (currentActiveTask === 'form_psb') {
+                code = item.customer_name || '';
+            }
+            return { ...item, resolvedCode: code };
+        });
+
+        // 2. LOGIKA PENYORTIRAN PINTAR (Tanggal Terbaru -> Kode Urutan Alfanumerik Alamiah)
+        resolvedItems.sort((a, b) => {
+            const dateA = a.tanggal || '';
+            const dateB = b.tanggal || '';
+            
+            // Jika tanggalnya berbeda, taruh tanggal yang lebih baru di bagian atas
+            if (dateA !== dateB) {
+                return dateB.localeCompare(dateA);
+            }
+            
+            // Jika tanggalnya sama, urutkan berdasarkan kodenya secara numerik-alamiah (misal: _02 -> _03 -> _04)
+            const codeA = a.resolvedCode || '';
+            const codeB = b.resolvedCode || '';
+            return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
+        });
+
+        // Update state data history yang tersortir
+        currentHistoryItems = resolvedItems;
+
+        container.innerHTML = currentHistoryItems.map(item => {
+            let cardTitle = item.resolvedCode || 'N/A';
+            let cardSubtitle = '';
+            let cardBadge = '';
+
+            if (currentActiveTask === 'form_odc') {
+                cardSubtitle = item.kegiatan || 'Preventif ODC';
+                cardBadge = `${item.hasil_opm} dBm`;
+            } else if (currentActiveTask === 'form_odp') {
+                cardSubtitle = `ODC: ${odcMap.get(item.odc_id) || '-'}`;
+                cardBadge = `${item.hasil_opm} dBm`;
+            } else if (currentActiveTask === 'form_closure') {
+                cardSubtitle = `Segment: ${item.segment || '-'}`;
+                cardBadge = item.kondisi_slack || 'BAIK';
+            } else if (currentActiveTask === 'form_span') {
+                cardSubtitle = `Segment: ${item.segment || '-'}`;
+                cardBadge = item.kondisi_slack || 'BAIK';
+            } else if (currentActiveTask === 'form_gangguan') {
+                cardSubtitle = `ID: ${item.service_id || '-'}`;
+                cardBadge = 'Gangguan';
+            } else if (currentActiveTask === 'form_dismantling') {
+                cardSubtitle = `ODP: ${odpMap.get(item.odp_id) || '-'}`;
+                cardBadge = 'Cabut';
+            } else if (currentActiveTask === 'form_psb') {
+                cardSubtitle = `ID: ${item.service_id || '-'}`;
+                cardBadge = 'PSB';
+            }
+
+            const formattedDate = item.tanggal ? new Date(item.tanggal).toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) : '-';
+
+            return `
+                <div onclick="openDetailModal('${item.id}')" class="bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-4 flex items-center justify-between cursor-pointer transition-all shadow-2xs">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-sky-50 text-sky-600 px-2.5 py-2 rounded-xl text-center shrink-0">
+                            <span class="block text-xs font-black leading-none">${formattedDate.split(' ')[0]}</span>
+                            <span class="block text-[8px] font-bold uppercase mt-0.5 leading-none">${formattedDate.split(' ')[1] || ''}</span>
+                        </div>
+                        <div class="text-left">
+                            <h4 class="text-xs font-black text-slate-800 uppercase tracking-tight">${cardTitle}</h4>
+                            <p class="text-[9px] text-slate-400 mt-0.5 leading-tight font-semibold uppercase">${cardSubtitle}</p>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-black text-sky-700 bg-sky-50 border border-sky-100 px-2.5 py-1 rounded-lg uppercase">${cardBadge}</span>
+                </div>`;
+        }).join('');
+
+    } catch (err) {
+        console.error("Gagal load riwayat:", err);
+        container.innerHTML = '<div class="text-center py-8 text-xs text-rose-500 font-bold">&#x26A0;&#xFE0F; Gagal memuat data riwayat</div>';
+    }
+}
+
+// ============================================================
+// CRUD READ: MODAL DETAIL LAPORAN TERKIRIM
+// ============================================================
+async function openDetailModal(recordId) {
+    selectedRecordId = recordId;
+    const item = currentHistoryItems.find(x => x.id === recordId);
+    if (!item) return;
+
+    const def = FORM_DEFINITIONS[currentActiveTask];
+    const modalContent = document.getElementById('detail-modal-content');
+    modalContent.innerHTML = '<div class="text-center py-4 text-slate-400">&#x23F3; Memuat detail...</div>';
+    document.getElementById('detail-modal').classList.remove('hidden');
+
+    let resolvedNames = {};
+    try {
+        if (item.odc_id) {
+            const res = await sb(`odc_master?id=eq.${item.odc_id}&select=odc_code`);
+            resolvedNames.odc = res?.[0]?.odc_code;
+        }
+        if (item.odp_id) {
+            const res = await sb(`odp_master?id=eq.${item.odp_id}&select=odp_code`);
+            resolvedNames.odp = res?.[0]?.odp_code;
+        }
+        if (item.closure_id) {
+            const res = await sb(`closure_master?id=eq.${item.closure_id}&select=closure_code`);
+            resolvedNames.closure = res?.[0]?.closure_code;
+        }
+        if (item.span_id) {
+            const res = await sb(`span_master?id=eq.${item.span_id}&select=span_code`);
+            resolvedNames.span = res?.[0]?.span_code;
+        }
+    } catch(e) { console.warn(e); }
+
+    let photoGridHtml = '';
+    try {
+        const photos = await sb(`photo_assets?record_id=eq.${recordId}&select=*`);
+        selectedRecordPhotos = photos || [];
+        if (selectedRecordPhotos.length > 0) {
+            photoGridHtml = `
+                <div class="mt-4 border-t border-slate-100 pt-3">
+                    <p class="font-bold text-slate-400 text-[9px] uppercase tracking-wider mb-2">Aset Foto Lapangan</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        ${selectedRecordPhotos.map(p => `
+                            <div class="bg-slate-50 border border-slate-200/50 rounded-xl p-1.5 text-center">
+                                <img src="${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${p.file_path}" class="w-full h-20 object-cover rounded-lg" />
+                                <p class="text-[8px] font-black text-slate-500 mt-1 uppercase">${p.photo_kind.replace(/^(foto_|photo_)/, '').replace(/_/g, ' ')}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+        }
+    } catch(e) { console.error("Gagal load foto:", e); }
+
+    let fieldsHtml = '';
+    const addField = (label, val) => {
+        if (val === undefined || val === null) return;
+        fieldsHtml += `
+            <div class="flex justify-between items-center py-1.5 border-b border-slate-100">
+                <span class="text-slate-400 font-bold uppercase tracking-wider text-[8px]">${label}</span>
+                <span class="text-slate-800 font-black text-right pl-3">${val}</span>
+            </div>`;
+    };
+
+    addField('Tanggal', item.tanggal);
+    if (resolvedNames.odc) addField('ODC', resolvedNames.odc);
+    if (resolvedNames.odp) addField('ODP', resolvedNames.odp);
+    if (resolvedNames.closure) addField('CLOSURE', resolvedNames.closure);
+    if (resolvedNames.span) addField('SPAN', resolvedNames.span);
+    if (item.hasil_opm !== undefined) addField('Hasil OPM', `${item.hasil_opm} dBm`);
+    if (item.kondisi) addField('Kondisi', item.kondisi);
+    if (item.kegiatan) addField('Kegiatan', item.kegiatan);
+    if (item.sisa_port) addField('Sisa Port', item.sisa_port);
+    if (item.segment) addField('Segment', item.segment);
+    if (item.pembangunan) addField('Pembangunan', item.pembangunan);
+    if (item.kondisi_slack) addField('Kondisi Slack', item.kondisi_slack);
+    if (item.customer_name) addField('Pelanggan', item.customer_name);
+    if (item.service_id) addField('ID Pelanggan', item.service_id);
+    if (item.no_hp) addField('No HP', item.no_hp);
+    if (item.alamat) addField('Alamat', item.alamat);
+    if (item.sn_ont) addField('SN ONT', item.sn_ont);
+    if (item.sn_ont_new) addField('SN ONT Baru', item.sn_ont_new);
+    if (item.sn_ont_old) addField('SN ONT Lama', item.sn_ont_old);
+    if (item.action) addField('Tindakan', item.action);
+    if (item.material) addField('Material', item.material);
+    if (item.jam_mulai && item.jam_selesai) addField('Jam Kerja', `${item.jam_mulai} - ${item.jam_selesai}`);
+    if (item.catatan) addField('Catatan', item.catatan);
+
+    modalContent.innerHTML = `
+        <div class="space-y-0.5">
+            ${fieldsHtml}
+        </div>
+        ${photoGridHtml}`;
+}
+
+function closeDetailModal() {
+    document.getElementById('detail-modal').classList.add('hidden');
+}
+
+// ============================================================
+// CRUD UPDATE: FORM EDIT PREFILLED MODE
+// ============================================================
+async function switchToEditMode() {
+    closeDetailModal();
+    currentTaskMode = 'edit';
+
+    // Rendery kosongkan draf form baru
+    renderCoreFormUI();
+
+    const item = currentHistoryItems.find(x => x.id === selectedRecordId);
+    if (!item) return;
+
+    // Prefill dropdown selectors, bypass filter untuk item yang terpilih sekarang
+    const needsOdc = ['form_odc','form_odp','form_gangguan','form_dismantling','form_psb'];
+    if (needsOdc.includes(currentActiveTask)) {
+        await syncAndRenderOdcDropdown(item.odc_id);
+        const odcSelect = document.getElementById('odc_id');
+        if (odcSelect) {
+            odcSelect.value = item.odc_id || '';
+            if (item.odp_id) {
+                await fetchOdpsForSelectedOdc(item.odp_id);
+                const odpSelect = document.getElementById('odp_id');
+                if (odpSelect) odpSelect.value = item.odp_id || '';
+            }
+        }
+    }
+    if (currentActiveTask === 'form_closure') {
+        await loadAllClosures();
+        const clsSelect = document.getElementById('closure_id');
+        if (clsSelect) clsSelect.value = item.closure_id || '';
+    }
+    if (currentActiveTask === 'form_span') {
+        await loadAllSpans();
+        const spnSelect = document.getElementById('span_id');
+        if (spnSelect) spnSelect.value = item.span_id || '';
+    }
+
+    // Prefill input teks reguler
+    document.getElementById('dynamic-form-fields').querySelectorAll('input,select,textarea').forEach(el => {
+        if (el.id && !['odc_id','odp_id','closure_id','span_id'].includes(el.id)) {
+            if (item[el.id] !== undefined && item[el.id] !== null) {
+                el.value = item[el.id];
+            }
+        }
+    });
+
+    // Prefill pratinjau foto lama dari database
+    const def = FORM_DEFINITIONS[currentActiveTask];
+    def.photoKinds.forEach((kind, i) => {
+        const exist = selectedRecordPhotos.find(p => p.photo_kind === kind);
+        const previewEl = document.getElementById('photo_preview_' + i);
+        if (exist && previewEl) {
+            previewEl.innerHTML = `
+                <img src="${SUPABASE_URL}/storage/v1/object/public/${STORAGE_BUCKET}/${exist.file_path}" class="w-full rounded-lg object-cover max-h-44" />
+                <p class="text-[10px] text-sky-600 font-bold mt-1">&#x1F4F8; Foto tersimpan di database</p>`;
+        }
+    });
 }
 
 async function loadAllProjectsForReport() {
@@ -647,12 +1020,15 @@ function handlePhotoSelect(event, index) {
     reader.readAsDataURL(file);
 }
 
+// ============================================================
+// CRUD CREATE & UPDATE SUBMISSION
+// ============================================================
 async function handleSubmit(event) {
     event.preventDefault();
     const def = FORM_DEFINITIONS[currentActiveTask];
     if (!def) return;
 
-    document.getElementById('btn-text').innerText = 'Menyimpan data...';
+    document.getElementById('btn-text').innerText = currentTaskMode === 'edit' ? 'Menyimpan perubahan...' : 'Menyimpan data...';
     document.getElementById('loading-spinner').classList.remove('hidden');
     document.getElementById('submit-btn').disabled = true;
 
@@ -675,10 +1051,28 @@ async function handleSubmit(event) {
         });
         if (technicianUserId) formData.technician_id = technicianUserId;
 
-        document.getElementById('btn-text').innerText = 'Menyimpan laporan...';
-        const inserted = await sbPost(def.table, formData);
-        const recordId = inserted?.[0]?.id;
-        if (!recordId) throw new Error('Gagal mendapatkan ID record yang disimpan.');
+        let resData;
+        if (currentTaskMode === 'edit') {
+            // KIRIM PERINTAH UPDATE (PATCH) UNTUK RECORD LAMA
+            const patchRes = await fetch(`${SUPABASE_URL_REST}/${def.table}?id=eq.${selectedRecordId}`, {
+                method: 'PATCH',
+                headers: {
+                    'apikey': SUPABASE_ANON_KEY,
+                    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=representation'
+                },
+                body: JSON.stringify(formData)
+            });
+            resData = await patchRes.json();
+            if (!patchRes.ok) throw new Error(resData.message || JSON.stringify(resData));
+        } else {
+            // KIRIM DATA BARU (POST)
+            resData = await sbPost(def.table, formData);
+        }
+
+        const recordId = currentTaskMode === 'edit' ? selectedRecordId : resData?.[0]?.id;
+        if (!recordId) throw new Error('Gagal mendapatkan ID record.');
 
         const photoKinds    = def.photoKinds || [];
         const uploadEntries = Object.entries(compressedBlobs);
@@ -691,8 +1085,18 @@ async function handleSubmit(event) {
             const photoKind = photoKinds[idx] || `foto_${idx + 1}`;
             const ts        = Date.now();
             const filename  = `${currentActiveTask}/${activeProjectId}/${recordId}_${photoKind}_${ts}.jpg`;
+            
             document.getElementById('btn-text').innerText = `Mengupload foto (${i+1}/${uploadEntries.length})...`;
+            
             try {
+                // JIKA EDIT: Bersihkan metadata foto lama dari database agar tidak duplikat
+                if (currentTaskMode === 'edit') {
+                    await fetch(`${SUPABASE_URL_REST}/photo_assets?record_id=eq.${recordId}&photo_kind=eq.${photoKind}`, {
+                        method: 'DELETE',
+                        headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` }
+                    });
+                }
+
                 const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/${STORAGE_BUCKET}/${filename}`, {
                     method: 'POST',
                     headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'image/jpeg', 'x-upsert': 'true' },
@@ -710,16 +1114,17 @@ async function handleSubmit(event) {
         }
 
         const totalFoto = uploadEntries.length;
-        const infoFoto  = totalFoto === 0 ? 'Data berhasil tersimpan (tanpa foto).'
-            : uploadedCount === totalFoto ? `Data & ${uploadedCount} foto berhasil tersimpan.`
-            : `Data tersimpan. Foto: ${uploadedCount}/${totalFoto} berhasil diupload.`;
+        const infoFoto  = currentTaskMode === 'edit'
+            ? 'Laporan berhasil diperbarui di database.'
+            : totalFoto === 0 ? 'Data berhasil tersimpan.'
+            : `Data & ${uploadedCount} foto berhasil tersimpan.`;
 
         document.getElementById('success-detail-text').innerText = infoFoto;
         document.getElementById('success-modal').classList.remove('hidden');
     } catch (err) {
         showErrorModal('Gagal mengirim: ' + err.message);
     } finally {
-        document.getElementById('btn-text').innerText = 'Kirim Berkas Laporan';
+        document.getElementById('btn-text').innerText = currentTaskMode === 'edit' ? 'Simpan Perubahan' : 'Kirim Berkas Laporan';
         document.getElementById('loading-spinner').classList.add('hidden');
         document.getElementById('submit-btn').disabled = false;
     }
@@ -727,7 +1132,8 @@ async function handleSubmit(event) {
 
 function afterSuccessRedirect() {
     document.getElementById('success-modal').classList.add('hidden');
-    showView('home');
+    currentTaskMode = 'list';
+    showView(currentActiveTask);
 }
 function showErrorModal(msg) {
     document.getElementById('error-message-text').innerText = msg;
@@ -761,6 +1167,7 @@ function checkProjectLifecycle() {
         document.getElementById('view-home').classList.add('hidden');
         document.getElementById('pm-form').classList.add('hidden');
         document.getElementById('view-generate-report').classList.add('hidden');
+        document.getElementById('view-history-list').classList.add('hidden');
         document.getElementById('btn-back-home').classList.add('hidden');
         document.getElementById('header-logo-container').classList.remove('hidden');
         document.getElementById('header-title').innerText    = 'PM TELECOM PORTAL';
@@ -851,7 +1258,7 @@ function clearActiveProject() {
     checkProjectLifecycle();
 }
 
-async function syncAndRenderOdcDropdown() {
+async function syncAndRenderOdcDropdown(preselectedId = null) {
     const odcSelect = document.getElementById('odc_id');
     if (!odcSelect) return;
     odcSelect.innerHTML = '<option value="" disabled selected>&#x23F3; Memuat ODC...</option>';
@@ -860,21 +1267,17 @@ async function syncAndRenderOdcDropdown() {
         let usedOdcIds = new Set();
 
         if (currentActiveTask === 'form_odc' && activeProjectId) {
-            // form ODC: filter ODC yang sudah diinput
             try { const used = await sb(`pm_odc?period_id=eq.${activeProjectId}&select=odc_id`); used.forEach(r => usedOdcIds.add(r.odc_id)); } catch {}
         } else if (currentActiveTask === 'form_odp' && activeProjectId) {
-            // form ODP: filter ODC yang semua ODP-nya sudah diinput di project ini
             try {
                 if (allOdc.length > 0) {
                     const odcIdsStr = allOdc.map(o => o.id).join(',');
-                    // AMBIL SEMUA ODP MASTER YANG HANYA BERELASI DENGAN ODC DI WILAYAH INI (MENGHINDARI MISMATCH SITE_ID)
                     const [allOdpMaster, usedOdp] = await Promise.all([
                         sb(`odp_master?odc_id=in.(${odcIdsStr})&is_active=eq.true&select=id,odc_id`),
                         sb(`pm_odp?period_id=eq.${activeProjectId}&select=odp_id`)
                     ]);
                     const usedOdpIds = new Set(usedOdp.map(r => r.odp_id));
                     
-                    // Tandai ODC sebagai "selesai" jika seluruh ODP miliknya sudah diinput di period_id project aktif ini
                     allOdc.forEach(odc => {
                         const odpsOfThisOdc = allOdpMaster.filter(o => o.odc_id === odc.id);
                         if (odpsOfThisOdc.length > 0 && odpsOfThisOdc.every(o => usedOdpIds.has(o.id))) {
@@ -889,7 +1292,9 @@ async function syncAndRenderOdcDropdown() {
 
         const isRequired = odcSelect.hasAttribute('required');
         const firstOpt   = isRequired ? '<option value="" disabled selected>Pilih Kode ODC</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
-        const available  = allOdc.filter(o => !usedOdcIds.has(o.id));
+        
+        // JIKA EDIT: Pastikan item yang sedang diedit tetap muncul di pilihan dropdown
+        const available  = allOdc.filter(o => !usedOdcIds.has(o.id) || o.id === preselectedId);
 
         if (currentActiveTask === 'form_odc' && available.length === 0) {
             odcSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODC sudah diinput</option>';
@@ -901,7 +1306,7 @@ async function syncAndRenderOdcDropdown() {
     } catch { odcSelect.innerHTML = '<option value="">&#x26A0;&#xFE0F; Gagal memuat</option>'; }
 }
 
-async function fetchOdpsForSelectedOdc() {
+async function fetchOdpsForSelectedOdc(preselectedId = null) {
     const odcSelect = document.getElementById('odc_id');
     const odpSelect = document.getElementById('odp_id');
     if (!odpSelect || !odcSelect?.value) return;
@@ -915,7 +1320,10 @@ async function fetchOdpsForSelectedOdc() {
         }
         const isRequired = odpSelect.hasAttribute('required');
         const firstOpt   = isRequired ? '<option value="" disabled selected>Pilih Kode ODP</option>' : '<option value="">\u2014 Tidak dipilih \u2014</option>';
-        const available  = allOdp.filter(o => !usedOdpIds.has(o.id));
+        
+        // JIKA EDIT: Pastikan ODP yang sedang diedit tetap muncul di pilihan dropdown
+        const available  = allOdp.filter(o => !usedOdpIds.has(o.id) || o.id === preselectedId);
+        
         if (currentActiveTask === 'form_odp' && available.length === 0) {
             odpSelect.innerHTML = '<option value="" disabled selected>&#x2705; Semua ODP sudah diinput</option>';
         } else {
