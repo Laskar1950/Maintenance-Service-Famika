@@ -51,6 +51,11 @@ const MODULE_TABLE_MAP = {
     psb:             'psb_records',
 };
 
+// ─── HELPER: Sort alfanumerik natural (misal: L1 < L2 < L10) ─────────────────
+function naturalSort(a, b) {
+    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
 // ─── HELPER: Download dari Storage lalu konversi ke JPEG via sharp ────────────
 async function downloadAsJpegBuffer(filePath) {
     const { data, error } = await supabase.storage
@@ -122,7 +127,6 @@ app.post('/api/report/odc', upload.any(), async (req, res) => {
 });
 
 // ─── [NEW] GET LIST DATA PER MODUL ───────────────────────────────────────────
-// GET /api/data/:module?project_id=xxx
 app.get('/api/data/:module', async (req, res) => {
     try {
         const { module } = req.params;
@@ -139,7 +143,6 @@ app.get('/api/data/:module', async (req, res) => {
 
         if (error) throw new Error(error.message);
 
-        // Ambil foto untuk semua record
         const ids = (data || []).map(r => r.id);
         let photoMap = {};
         if (ids.length > 0) {
@@ -153,7 +156,6 @@ app.get('/api/data/:module', async (req, res) => {
             });
         }
 
-        // Ambil master data untuk lookup nama ODC/ODP/Closure/Span
         const [{ data: odcMaster }, { data: odpMaster }, { data: closureMaster }, { data: spanMaster }] = await Promise.all([
             supabase.from('odc_master').select('id, odc_code'),
             supabase.from('odp_master').select('id, odp_code'),
@@ -178,7 +180,6 @@ app.get('/api/data/:module', async (req, res) => {
 });
 
 // ─── [NEW] GET DETAIL SINGLE RECORD ──────────────────────────────────────────
-// GET /api/data/:module/:id
 app.get('/api/data/:module/:id', async (req, res) => {
     try {
         const { module, id } = req.params;
@@ -193,7 +194,6 @@ app.get('/api/data/:module/:id', async (req, res) => {
             .select('id, photo_kind, file_path, file_name')
             .eq('record_id', id);
 
-        // Buat signed URL untuk setiap foto agar bisa ditampilkan di preview
         const photosWithUrl = await Promise.all((photos || []).map(async p => {
             const { data: signed } = await supabase.storage
                 .from(STORAGE_BUCKET)
@@ -209,8 +209,6 @@ app.get('/api/data/:module/:id', async (req, res) => {
 });
 
 // ─── [NEW] PUT UPDATE RECORD ──────────────────────────────────────────────────
-// PUT /api/data/:module/:id
-// Body: { fields: {...}, deletedPhotoIds: [...], newPhotos: [{photo_kind, file_path, file_name, file_size, uploaded_by}] }
 app.put('/api/data/:module/:id', async (req, res) => {
     try {
         const { module, id } = req.params;
@@ -219,27 +217,19 @@ app.put('/api/data/:module/:id', async (req, res) => {
 
         const { fields = {}, deletedPhotoIds = [], newPhotos = [] } = req.body;
 
-        // Update field utama
         const { error: updateErr } = await supabase.from(tableName).update(fields).eq('id', id);
         if (updateErr) throw new Error(updateErr.message);
 
-        // Hapus foto lama yang ditandai dihapus
         if (deletedPhotoIds.length > 0) {
             const { data: toDelete } = await supabase
                 .from('photo_assets')
                 .select('file_path')
                 .in('id', deletedPhotoIds);
-
-            // Hapus dari storage
             const filePaths = (toDelete || []).map(p => p.file_path);
-            if (filePaths.length > 0) {
-                await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
-            }
-            // Hapus dari tabel photo_assets
+            if (filePaths.length > 0) await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
             await supabase.from('photo_assets').delete().in('id', deletedPhotoIds);
         }
 
-        // Insert foto baru (sudah diupload dari client ke storage)
         if (newPhotos.length > 0) {
             const insertData = newPhotos.map(p => ({
                 module_name: module,
@@ -262,29 +252,21 @@ app.put('/api/data/:module/:id', async (req, res) => {
 });
 
 // ─── [NEW] DELETE RECORD ──────────────────────────────────────────────────────
-// DELETE /api/data/:module/:id
 app.delete('/api/data/:module/:id', async (req, res) => {
     try {
         const { module, id } = req.params;
         const tableName = MODULE_TABLE_MAP[module];
         if (!tableName) return res.status(400).json({ success: false, message: `Modul "${module}" tidak dikenali.` });
 
-        // Ambil semua foto terkait
         const { data: photos } = await supabase
             .from('photo_assets')
             .select('file_path')
             .eq('record_id', id);
 
-        // Hapus dari storage
         const filePaths = (photos || []).map(p => p.file_path);
-        if (filePaths.length > 0) {
-            await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
-        }
-
-        // Hapus dari photo_assets
+        if (filePaths.length > 0) await supabase.storage.from(STORAGE_BUCKET).remove(filePaths);
         await supabase.from('photo_assets').delete().eq('record_id', id);
 
-        // Hapus record utama
         const { error: delErr } = await supabase.from(tableName).delete().eq('id', id);
         if (delErr) throw new Error(delErr.message);
 
@@ -342,7 +324,6 @@ app.get('/api/report/preview', async (req, res) => {
             const { data: signedData, error: signErr } = await supabase.storage
                 .from(STORAGE_BUCKET)
                 .createSignedUrl(p.file_path, 3600);
-
             photoRows.push({
                 module:     recordModuleMap[p.record_id] || p.module_name || '-',
                 photo_kind: p.photo_kind,
@@ -412,15 +393,43 @@ app.get('/api/report/export', async (req, res) => {
             supabase.from('span_master').select('*')
         ]);
 
-        const [{ data: pmOdc }, { data: pmOdp }, { data: pmClosure }, { data: pmSpan }, { data: corrective }, { data: dismantling }, { data: psb }] = await Promise.all([
+        const [{ data: pmOdcRaw }, { data: pmOdpRaw }, { data: pmClosureRaw }, { data: pmSpanRaw }, { data: corrective }, { data: dismantling }, { data: psb }] = await Promise.all([
             supabase.from('pm_odc').select('*').eq('period_id', project_id),
             supabase.from('pm_odp').select('*').eq('period_id', project_id),
             supabase.from('pm_closure').select('*').eq('period_id', project_id),
             supabase.from('pm_span').select('*').eq('period_id', project_id),
-            supabase.from('corrective_customer').select('*').eq('period_id', project_id),
-            supabase.from('dismantling_records').select('*').eq('period_id', project_id),
-            supabase.from('psb_records').select('*').eq('period_id', project_id)
+            supabase.from('corrective_customer').select('*').eq('period_id', project_id).order('created_at', { ascending: true }),
+            supabase.from('dismantling_records').select('*').eq('period_id', project_id).order('created_at', { ascending: true }),
+            supabase.from('psb_records').select('*').eq('period_id', project_id).order('created_at', { ascending: true })
         ]);
+
+        // ── Sort ODC berdasarkan odc_code alfanumerik ─────────────────────────
+        const pmOdc = (pmOdcRaw || []).sort((a, b) => {
+            const codeA = odcMaster?.find(o => o.id === a.odc_id)?.odc_code || '';
+            const codeB = odcMaster?.find(o => o.id === b.odc_id)?.odc_code || '';
+            return naturalSort(codeA, codeB);
+        });
+
+        // ── Sort ODP berdasarkan odp_code alfanumerik ─────────────────────────
+        const pmOdp = (pmOdpRaw || []).sort((a, b) => {
+            const codeA = odpMaster?.find(o => o.id === a.odp_id)?.odp_code || '';
+            const codeB = odpMaster?.find(o => o.id === b.odp_id)?.odp_code || '';
+            return naturalSort(codeA, codeB);
+        });
+
+        // ── Sort Closure berdasarkan closure_code alfanumerik ─────────────────
+        const pmClosure = (pmClosureRaw || []).sort((a, b) => {
+            const codeA = closureMaster?.find(o => o.id === a.closure_id)?.closure_code || '';
+            const codeB = closureMaster?.find(o => o.id === b.closure_id)?.closure_code || '';
+            return naturalSort(codeA, codeB);
+        });
+
+        // ── Sort Span berdasarkan span_code alfanumerik ───────────────────────
+        const pmSpan = (pmSpanRaw || []).sort((a, b) => {
+            const codeA = spanMaster?.find(o => o.id === a.span_id)?.span_code || '';
+            const codeB = spanMaster?.find(o => o.id === b.span_id)?.span_code || '';
+            return naturalSort(codeA, codeB);
+        });
 
         const allRecordIds = [
             ...(pmOdc        || []).map(r => r.id),
@@ -578,7 +587,7 @@ app.get('/api/report/export', async (req, res) => {
             headers_r5: ['NO','TANGGAL','ODC','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','BUKA','TUTUP','BUKA','TUTUP','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:G5','H5:I5','J5:K5'],
-            rowsData: (pmOdc || []).map((item, idx) => ({
+            rowsData: pmOdc.map((item, idx) => ({
                 id: item.id,
                 data: [idx+1, item.tanggal, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A', item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
             })),
@@ -598,7 +607,7 @@ app.get('/api/report/export', async (req, res) => {
             headers_r5: ['NO','TANGGAL','ODC','ODP','SISA PORT','KONDISI','KEGIATAN','BEFORE','','AFTER','','HASIL OPM',''],
             headers_r6: ['','','','','','','','TUTUP','BUKA','TUTUP','BUKA','FOTO','REDAMAN'],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:I5','J5:K5','L5:M5'],
-            rowsData: (pmOdp || []).map((item, idx) => ({
+            rowsData: pmOdp.map((item, idx) => ({
                 id: item.id,
                 data: [idx+1, item.tanggal, odcMaster?.find(o => o.id === item.odc_id)?.odc_code || 'N/A', odpMaster?.find(o => o.id === item.odp_id)?.odp_code || 'N/A', item.sisa_port, item.kondisi, item.kegiatan, '','','','','', item.hasil_opm]
             })),
@@ -619,7 +628,7 @@ app.get('/api/report/export', async (req, res) => {
             headers_r5: ['NO','TANGGAL','KODE CLOSURE','KONDISI','KEGIATAN','FOTO CLOSURE','FOTO SPARE KABEL','FOTO KESELURUHAN'],
             headers_r6: ['','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6'],
-            rowsData: (pmClosure || []).map((item, idx) => ({
+            rowsData: pmClosure.map((item, idx) => ({
                 id: item.id,
                 data: [idx+1, item.tanggal, closureMaster?.find(o => o.id === item.closure_id)?.closure_code || 'N/A', item.kondisi, item.kegiatan, '','','']
             })),
@@ -633,7 +642,7 @@ app.get('/api/report/export', async (req, res) => {
             headers_r5: ['NO','TANGGAL','KODE SPAN','KONDISI','KEGIATAN','FOTO SPAN','FOTO SPARE KABEL','FOTO KESELURUHAN'],
             headers_r6: ['','','','','','','',''],
             mergeSpecs:  ['A5:A6','B5:B6','C5:C6','D5:D6','E5:E6','F5:F6','G5:G6','H5:H6'],
-            rowsData: (pmSpan || []).map((item, idx) => ({
+            rowsData: pmSpan.map((item, idx) => ({
                 id: item.id,
                 data: [idx+1, item.tanggal, spanMaster?.find(o => o.id === item.span_id)?.span_code || 'N/A', item.kondisi, item.kegiatan, '','','']
             })),
