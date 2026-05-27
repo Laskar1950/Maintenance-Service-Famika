@@ -1381,23 +1381,31 @@ function checkProjectLifecycle() {
         showView('home');
     }
 }
+    
 function toggleProjectTab(tab) {
     const btnSelect = document.getElementById('tab-btn-select');
     const btnCreate = document.getElementById('tab-btn-create');
+
     if (tab === 'select') {
-        btnSelect.className = 'bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all';
-        btnCreate.className = 'text-slate-500 py-2.5 rounded-lg transition-all';
+        btnSelect.className = 'bg-white text-slate-800 py-3 rounded-xl shadow-sm transition-all';
+        btnCreate.className = 'text-slate-500 py-3 rounded-xl transition-all';
+
         document.getElementById('project-panel-select').classList.remove('hidden');
         document.getElementById('project-panel-create').classList.add('hidden');
+
         fetchSitesAndProjects();
     } else {
-        btnCreate.className = 'bg-white text-slate-800 py-2.5 rounded-lg shadow-sm transition-all';
-        btnSelect.className = 'text-slate-500 py-2.5 rounded-lg transition-all';
+        btnCreate.className = 'bg-white text-slate-800 py-3 rounded-xl shadow-sm transition-all';
+        btnSelect.className = 'text-slate-500 py-3 rounded-xl transition-all';
+
         document.getElementById('project-panel-create').classList.remove('hidden');
         document.getElementById('project-panel-select').classList.add('hidden');
+
+        toggleAdminProjectActions();
     }
 }
-async function fetchSitesAndProjects() {
+    
+    async function fetchSitesAndProjects() {
     const selectEl     = document.getElementById('select_active_project');
     const siteSelectEl = document.getElementById('new_project_site');
 
