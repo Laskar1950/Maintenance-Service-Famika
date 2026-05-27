@@ -23,7 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, x-telegram-username');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     if (req.method === 'OPTIONS') return res.sendStatus(200);
     next();
@@ -288,10 +288,65 @@ app.delete('/api/data/:module/:id', async (req, res) => {
     }
 });
 
+// ─── HELPER AUTH ADMIN ─────────────────────────────────────────────────────────
+async function assertAdminFromRequest(req) {
+    const rawUsername =
+        req.headers['x-telegram-username'] ||
+        req.query?.username ||
+        req.body?.username;
+
+    if (!rawUsername) {
+        return {
+            ok: false,
+            status: 401,
+            message: 'Username admin tidak ditemukan. Silakan buka aplikasi dari Telegram.'
+        };
+    }
+
+    const username = String(rawUsername).replace(/^@/, '').trim();
+
+    const { data, error } = await supabase
+        .from('users')
+        .select('id, full_name, username, role')
+        .or(`username.eq.${username},full_name.eq.${username}`)
+        .limit(1);
+
+    if (error) {
+        return {
+            ok: false,
+            status: 500,
+            message: error.message
+        };
+    }
+
+    const user = data?.[0];
+
+    if (!user || user.role !== 'admin') {
+        return {
+            ok: false,
+            status: 403,
+            message: 'Akses ditolak. Hanya admin yang dapat menghapus project.'
+        };
+    }
+
+    return {
+        ok: true,
+        user
+    };
+}
+
 // ─── [NEW] DELETE PROJECT (ADMIN ONLY) ────────────────────────────────────────
 // Menghapus project beserta SEMUA data terkait (semua tabel + foto di storage)
 app.delete('/api/project/:id', async (req, res) => {
     try {
+        const adminCheck = await assertAdminFromRequest(req);
+        if (!adminCheck.ok) {
+            return res.status(adminCheck.status).json({
+                success: false,
+                message: adminCheck.message
+            });
+        }
+
         const { id: projectId } = req.params;
 
         // 1. Cek project ada
@@ -300,38 +355,73 @@ app.delete('/api/project/:id', async (req, res) => {
             .select('id, project_name')
             .eq('id', projectId)
             .single();
+
         if (projCheckErr || !project) {
-            return res.status(404).json({ success: false, message: 'Project tidak ditemukan.' });
+            return res.status(404).json({
+                success: false,
+                message: 'Project tidak ditemukan.'
+            });
         }
 
         // 2. Kumpulkan semua record_id dari seluruh tabel terkait
         const allRecordIds = [];
+
         for (const tableName of PROJECT_RELATED_TABLES) {
-            const { data: rows } = await supabase
+            const { data: rows, error: rowsErr } = await supabase
                 .from(tableName)
                 .select('id')
                 .eq('period_id', projectId);
+
+            if (rowsErr) {
+                console.warn(`[DELETE PROJECT] Gagal membaca tabel ${tableName}:`, rowsErr.message);
+                continue;
+            }
+
             if (rows && rows.length > 0) {
                 rows.forEach(r => allRecordIds.push(r.id));
             }
         }
 
-        // 3. Hapus semua file foto dari Storage (jika ada)
+        // 3. Hapus semua file foto dari Storage
         if (allRecordIds.length > 0) {
-            const { data: photos } = await supabase
+            const { data: photos, error: photoErr } = await supabase
                 .from('photo_assets')
                 .select('file_path')
                 .in('record_id', allRecordIds);
-            const filePaths = (photos || []).map(p => p.file_path);
+
+            if (photoErr) {
+                console.warn('[DELETE PROJECT] Gagal membaca metadata foto:', photoErr.message);
+            }
+
+            const filePaths = (photos || [])
+                .map(p => p.file_path)
+                .filter(Boolean);
+
             if (filePaths.length > 0) {
-                // Hapus storage in batch (max 1000 per call)
                 const BATCH = 1000;
+
                 for (let i = 0; i < filePaths.length; i += BATCH) {
-                    await supabase.storage.from(STORAGE_BUCKET).remove(filePaths.slice(i, i + BATCH));
+                    const batch = filePaths.slice(i, i + BATCH);
+
+                    const { error: removeErr } = await supabase.storage
+                        .from(STORAGE_BUCKET)
+                        .remove(batch);
+
+                    if (removeErr) {
+                        console.warn('[DELETE PROJECT] Gagal hapus batch foto:', removeErr.message);
+                    }
                 }
             }
+
             // 4. Hapus metadata foto dari tabel photo_assets
-            await supabase.from('photo_assets').delete().in('record_id', allRecordIds);
+            const { error: delPhotoMetaErr } = await supabase
+                .from('photo_assets')
+                .delete()
+                .in('record_id', allRecordIds);
+
+            if (delPhotoMetaErr) {
+                console.warn('[DELETE PROJECT] Gagal hapus metadata foto:', delPhotoMetaErr.message);
+            }
         }
 
         // 5. Hapus semua record dari tabel-tabel terkait
@@ -340,6 +430,7 @@ app.delete('/api/project/:id', async (req, res) => {
                 .from(tableName)
                 .delete()
                 .eq('period_id', projectId);
+
             if (delTableErr) {
                 console.warn(`[DELETE PROJECT] Gagal hapus tabel ${tableName}:`, delTableErr.message);
             }
@@ -350,14 +441,24 @@ app.delete('/api/project/:id', async (req, res) => {
             .from('projects')
             .delete()
             .eq('id', projectId);
+
         if (delProjectErr) throw new Error(delProjectErr.message);
 
-        console.log(`[DELETE PROJECT] Project "${project.project_name}" (${projectId}) berhasil dihapus.`);
-        res.json({ success: true, message: `Project "${project.project_name}" beserta semua datanya berhasil dihapus.` });
+        console.log(
+            `[DELETE PROJECT] Admin ${adminCheck.user.username || adminCheck.user.full_name} menghapus project "${project.project_name}" (${projectId}).`
+        );
+
+        res.json({
+            success: true,
+            message: `Project "${project.project_name}" beserta semua data dan foto terkait berhasil dihapus.`
+        });
 
     } catch (err) {
         console.error('[DELETE PROJECT]', err.message);
-        res.status(500).json({ success: false, message: err.message });
+        res.status(500).json({
+            success: false,
+            message: err.message
+        });
     }
 });
 
