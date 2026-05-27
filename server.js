@@ -51,6 +51,17 @@ const MODULE_TABLE_MAP = {
     psb:             'psb_records',
 };
 
+// Tabel-tabel yang berelasi dengan project_id (period_id)
+const PROJECT_RELATED_TABLES = [
+    'pm_odc',
+    'pm_odp',
+    'pm_closure',
+    'pm_span',
+    'corrective_customer',
+    'dismantling_records',
+    'psb_records',
+];
+
 // ─── HELPER: Sort alfanumerik natural (misal: L1 < L2 < L10) ─────────────────
 function naturalSort(a, b) {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -273,6 +284,79 @@ app.delete('/api/data/:module/:id', async (req, res) => {
         res.json({ success: true, message: 'Data berhasil dihapus.' });
     } catch (err) {
         console.error('[DELETE]', err.message);
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+// ─── [NEW] DELETE PROJECT (ADMIN ONLY) ────────────────────────────────────────
+// Menghapus project beserta SEMUA data terkait (semua tabel + foto di storage)
+app.delete('/api/project/:id', async (req, res) => {
+    try {
+        const { id: projectId } = req.params;
+
+        // 1. Cek project ada
+        const { data: project, error: projCheckErr } = await supabase
+            .from('projects')
+            .select('id, project_name')
+            .eq('id', projectId)
+            .single();
+        if (projCheckErr || !project) {
+            return res.status(404).json({ success: false, message: 'Project tidak ditemukan.' });
+        }
+
+        // 2. Kumpulkan semua record_id dari seluruh tabel terkait
+        const allRecordIds = [];
+        for (const tableName of PROJECT_RELATED_TABLES) {
+            const { data: rows } = await supabase
+                .from(tableName)
+                .select('id')
+                .eq('period_id', projectId);
+            if (rows && rows.length > 0) {
+                rows.forEach(r => allRecordIds.push(r.id));
+            }
+        }
+
+        // 3. Hapus semua file foto dari Storage (jika ada)
+        if (allRecordIds.length > 0) {
+            const { data: photos } = await supabase
+                .from('photo_assets')
+                .select('file_path')
+                .in('record_id', allRecordIds);
+            const filePaths = (photos || []).map(p => p.file_path);
+            if (filePaths.length > 0) {
+                // Hapus storage in batch (max 1000 per call)
+                const BATCH = 1000;
+                for (let i = 0; i < filePaths.length; i += BATCH) {
+                    await supabase.storage.from(STORAGE_BUCKET).remove(filePaths.slice(i, i + BATCH));
+                }
+            }
+            // 4. Hapus metadata foto dari tabel photo_assets
+            await supabase.from('photo_assets').delete().in('record_id', allRecordIds);
+        }
+
+        // 5. Hapus semua record dari tabel-tabel terkait
+        for (const tableName of PROJECT_RELATED_TABLES) {
+            const { error: delTableErr } = await supabase
+                .from(tableName)
+                .delete()
+                .eq('period_id', projectId);
+            if (delTableErr) {
+                console.warn(`[DELETE PROJECT] Gagal hapus tabel ${tableName}:`, delTableErr.message);
+            }
+        }
+
+        // 6. Hapus project itu sendiri
+        const { error: delProjectErr } = await supabase
+            .from('projects')
+            .delete()
+            .eq('id', projectId);
+        if (delProjectErr) throw new Error(delProjectErr.message);
+
+        console.log(`[DELETE PROJECT] Project "${project.project_name}" (${projectId}) berhasil dihapus.`);
+        res.json({ success: true, message: `Project "${project.project_name}" beserta semua datanya berhasil dihapus.` });
+
+    } catch (err) {
+        console.error('[DELETE PROJECT]', err.message);
         res.status(500).json({ success: false, message: err.message });
     }
 });
